@@ -1,0 +1,44 @@
+## Development
+
+When starting the dev server, use background mode:
+
+```
+astro dev --background
+```
+
+Manage the background server with `astro dev stop`, `astro dev status`, and `astro dev logs`.
+
+## Documentation
+
+Full documentation: https://docs.astro.build
+
+Consult these guides before working on related tasks:
+
+- [Adding pages, dynamic routes, or middleware](https://docs.astro.build/en/guides/routing/)
+- [Working with Astro components](https://docs.astro.build/en/basics/astro-components/)
+- [Using React, Vue, Svelte, or other framework components](https://docs.astro.build/en/guides/framework-components/)
+- [Adding or managing content](https://docs.astro.build/en/guides/content-collections/)
+- [Adding styles or using Tailwind](https://docs.astro.build/en/guides/styling/)
+- [Supporting multiple languages](https://docs.astro.build/en/guides/internationalization/)
+
+## Project notes
+
+- The site is fully static (GitHub Pages). Profiles load in the browser from public, unauthenticated APIs in `src/lib/public-api.ts`. Never add anything that needs a token in the browser.
+- The README card generator (`scripts/generate.tsx`, used by `action.yml` and the Pages workflow) runs in GitHub Actions with a free token and uses GraphQL via `src/lib/github.ts`. Both paths must end in `normalize()` so cards see the same `Profile`.
+- All internal links go through `src/lib/urls.ts`, because the site lives under a base path (`/git-card/`). Never hardcode `/u/...` or `/rank`.
+- Profiles and cards are query-string pages (`u/?user=`, `card/?user=&id=`), because a static host has no rewrites. `?embed` and `?theme=` are read by an inline script in `Base.astro` before first paint.
+- The rate limit is 60 core requests an hour and 10 searches a minute per visitor. Keep a profile load at or under about 8 core requests and 5 searches, and keep the one-hour localStorage cache.
+- Site name, repo, Action slug and social links live in `src/site.ts`.
+- Keys in `src/cards/registry.ts` are public URL slugs and file names. Never rename one.
+- Cards are pure React SVG components with no hooks or effects, because they also render to standalone `.svg` files in Node.
+- Copy rules: no em dashes or semicolons in user-facing text.
+- Use the justfile: `just dev`, `just format`, `just ci` (format check, lint, types, tests, build). Run `just ci` before calling a change done.
+- Prettier turns line breaks in `.astro` markup into spaces, so never put punctuation directly after an inline element there. Restructure the copy or generate the punctuation with CSS.
+- The site is dark only for now: `LIGHT_THEME = false` in `src/cards/style.ts` hides the toggle and the embed theme picker and makes every theme render dark. Keep the DAY tokens working so it can be switched back on.
+- Theme is "Night City": colors live in `src/cards/style.ts` (`THEME_CSS`, plus the standalone SVG tokens), not in CSS files. Yellow (`--accent`/`--signal`) is UI chrome, cyan (`--data`) is data, neon green (`--hot`) is the heatmap's peak day and super-elite highlights. In the skyline only, the peak tower is neon green (`--peak`) and empty days are sea (`--sea`, one color, with a gentle wave animation).
+- OG images (`src/og`) are rendered by resvg, which only understands class selectors and plain colors. New card CSS must go through `flattenCss` cleanly (no new CSS functions beyond `var()` and `color-mix()`), and text must use glyphs the bundled fonts in `src/og/fonts` have. Draw icons as shapes.
+- Never put an SVG filter (like `gc-glow`) on a perfectly horizontal or vertical line. Its bounding box has zero width or height, so the filter clips it away.
+- The rank model is `src/lib/rank.ts`, and `/rank` renders its constants. Change weights or medians there only, keep `src/lib/rank.test.ts` passing (typical developer at D, empty profile at F, one viral repo not elite), and recheck a few well-known profiles before shipping a change.
+- If dev starts failing with "file does not exist in the optimize deps directory" after packages change, stop the server, delete `node_modules/.vite` and start again.
+- The logo source is `assets/brand/git-card-logo.png`. Everything derived from it (public/brand, favicons, the embedded `src/brand/logo-data.ts` used in cards and OG images) comes from `just brand`. Never edit those by hand.
+- Layout: header, main and footer span 90% of the viewport. No `max-width` caps on text or containers, and no hard line breaks (`<br>`) in copy. Let text wrap naturally, with `text-wrap: balance` on headings.

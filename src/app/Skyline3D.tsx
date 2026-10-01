@@ -1,0 +1,65 @@
+import { useEffect, useRef, useState } from 'react';
+import { skylineCells } from '../cards/levels';
+import { shortDate } from '../lib/format';
+import type { Profile } from '../lib/profile';
+
+const supportsWebGL = () => {
+  try {
+    return !!document.createElement('canvas').getContext('webgl2');
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Sits on top of the static SVG skyline and fades in once WebGL has drawn, so there is never an empty box.
+ * three.js is only downloaded when the skyline scrolls near the viewport. Without WebGL the SVG stays.
+ */
+export function Skyline3D({ profile }: { profile: Profile }) {
+  const host = useRef<HTMLDivElement>(null);
+  const readout = useRef<HTMLDivElement>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const el = host.current;
+    if (!el || !supportsWebGL()) return;
+    let dispose: (() => void) | undefined;
+    let cancelled = false;
+    const io = new IntersectionObserver(
+      async ([entry]) => {
+        if (!entry.isIntersecting) return;
+        io.disconnect();
+        const { mountSkyline } = await import('../scenes/skyline');
+        if (cancelled) return;
+        dispose = mountSkyline(el, skylineCells(profile), profile.weeks.length, {
+          onHover: (cell) => {
+            if (readout.current)
+              readout.current.textContent = cell ? `${cell[2]} on ${shortDate(cell[5])} ${cell[5].slice(0, 4)}` : 'Drag to orbit';
+          },
+          onReady: () => setReady(true),
+        });
+      },
+      { rootMargin: '200px' },
+    );
+    io.observe(el);
+    return () => {
+      cancelled = true;
+      io.disconnect();
+      dispose?.();
+    };
+  }, [profile]);
+
+  return (
+    <div
+      ref={host}
+      className={ready ? 'sky3d is-ready' : 'sky3d'}
+      role="img"
+      aria-label={`3D skyline of ${profile.login}'s contributions over the last year`}
+    >
+      <div className="sky3d-label eyebrow">Contribution skyline · 3D</div>
+      <div ref={readout} className="sky3d-hover caption tabular" aria-live="polite">
+        Drag to orbit
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,10 @@
+dist
+.astro
+.wrangler
+node_modules
+pnpm-lock.yaml
+src/og/fonts
+public
+legacy
+og-out
+src/brand/logo-data.ts

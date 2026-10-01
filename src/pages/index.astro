@@ -1,0 +1,71 @@
+---
+import Base from '../layouts/Base.astro';
+import { href, urls } from '../lib/urls';
+
+export const prerender = true;
+
+const examples = ['torvalds', 'gaearon', 'sindresorhus', 'yyx990803'];
+---
+
+<Base
+  title="git-card: your GitHub, as a city"
+  description="Type a GitHub username and get a 3D contribution skyline, streaks, languages and top repos. Every card has its own link you can embed anywhere."
+>
+  <section class="hero hud">
+    <div class="hero-floor" aria-hidden="true"></div>
+    <p class="eyebrow">Public GitHub data // rendered live</p>
+    <h1 class="display glitch rgb" data-text="Your GitHub, as a city.">
+      Your GitHub, <span class="neon">as a city.</span>
+    </h1>
+    <p class="lead">
+      A 3D skyline of your year, your streaks, languages and best repos. Every card has its own link, so you can drop it into a README, a
+      blog or a portfolio.
+    </p>
+    <form class="lookup" action={href('u/')} method="get" role="search">
+      <label for="u" class="eyebrow">
+        Target handle
+      </label>
+      <div class="lookup-row hud">
+        <span class="lookup-at" aria-hidden="true">
+          &gt; @
+        </span>
+        <input id="u" name="user" required autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="torvalds" />
+        <button type="submit">Jack in</button>
+      </div>
+    </form>
+    <p class="caption try">
+      <span>Try</span>
+      {/* Commas come from CSS, so formatter line breaks can never put a space before them. */}
+      <span class="examples">
+        {examples.map((login) => (
+          <a href={urls.profile(login)}>@{login}</a>
+        ))}
+      </span>
+    </p>
+  </section>
+
+  <section class="how" id="how">
+    <p class="eyebrow">Every card is a URL</p>
+    <h2 class="title rgb">Embed one card or the whole thing.</h2>
+    <dl class="url-list tabular">
+      <div>
+        <dt>
+          u/?user=<em>login</em>
+        </dt>
+        <dd>The full profile, built in your browser from public GitHub data.</dd>
+      </div>
+      <div>
+        <dt>
+          card/?user=<em>login</em>&amp;id=skyline
+        </dt>
+        <dd>
+          One card on its own page. Add <code>&amp;embed</code> for an iframe.
+        </dd>
+      </div>
+      <div>
+        <dt>README</dt>
+        <dd>Every card downloads as an SVG. Add the GitHub Action and it re-renders into your repo every day.</dd>
+      </div>
+    </dl>
+  </section>
+</Base>

@@ -1,0 +1,20 @@
+---
+import { href } from '../lib/urls';
+import { SITE } from '../site';
+
+interface Props {
+  /** Rendered height in CSS pixels. Width follows the logo's aspect ratio. */
+  height?: number;
+}
+
+const { height = 44 } = Astro.props;
+// public/brand/logo.png is 1288 x 623.
+const width = Math.round((height * 1288) / 623);
+---
+
+<a class="logo" href={href('')} aria-label={`${SITE.name} home`}>
+  <picture>
+    <source srcset={href('brand/logo-480.webp')} type="image/webp" />
+    <img src={href('brand/logo-480.png')} alt={SITE.name} width={width} height={height} decoding="async" />
+  </picture>
+</a>

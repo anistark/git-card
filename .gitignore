@@ -1,0 +1,40 @@
+# build output
+dist/
+# generated types
+.astro/
+
+# dependencies
+node_modules/
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+
+# environment variables
+.env
+.env.production
+
+# macOS-specific files
+.DS_Store
+
+# jetbrains setting folder
+.idea/
+
+# local secrets for wrangler / astro dev
+.dev.vars
+
+# local wrangler and miniflare state
+.wrangler/
+
+.claude
+.pi
+.vscode
+
+# rendered OG previews from `just og`
+og-out/
+
+# parked Cloudflare Workers version, kept local only
+legacy/

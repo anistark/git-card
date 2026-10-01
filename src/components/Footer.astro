@@ -1,0 +1,91 @@
+---
+import { BUILT_WITH, SITE, SOCIALS } from '../site';
+import { href, urls } from '../lib/urls';
+import Icon from './Icon.astro';
+import Logo from './Logo.astro';
+
+const year = new Date().getFullYear();
+const examples = ['torvalds', 'gaearon', 'sindresorhus'];
+
+const columns = [
+  {
+    title: 'Project',
+    links: [
+      { label: 'Source code', url: SITE.repo, external: true },
+      { label: 'Report an issue', url: SITE.issues, external: true },
+      { label: 'Contributing', url: SITE.contributing, external: true },
+      { label: `${SITE.license.name} License`, url: SITE.license.url, external: true },
+    ],
+  },
+  {
+    title: 'Explore',
+    links: [
+      ...examples.map((login) => ({ label: `@${login}`, url: urls.profile(login), external: false })),
+      { label: 'How ranks work', url: urls.rank(), external: false },
+      { label: 'How embedding works', url: href('#how'), external: false },
+    ],
+  },
+  {
+    title: 'Built with',
+    links: BUILT_WITH.map((b) => ({ ...b, external: true })),
+  },
+];
+---
+
+<footer class="site-footer">
+  <div class="footer-grid">
+    <div class="footer-brand">
+      <Logo height={64} />
+      <p class="caption">
+        {SITE.tagline} Free and open source under the {SITE.license.name} License. Fork it, self-host it, send a PR.
+      </p>
+      <a class="btn btn-ghost footer-star" href={SITE.repo} rel="noopener">
+        Star on GitHub
+      </a>
+    </div>
+
+    {columns.map((col) => (
+      <nav class="footer-col" aria-label={col.title}>
+        <p class="eyebrow">{col.title}</p>
+        <ul>
+          {col.links.map((link) => (
+            <li>
+              <a href={link.url} rel={link.external ? 'noopener' : undefined}>
+                {link.label}
+                {link.external && (
+                  <span class="ext" aria-hidden="true">
+                    ↗
+                  </span>
+                )}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </nav>
+    ))}
+  </div>
+
+  <div class="footer-bar">
+    <!-- No punctuation right after a link: formatter line breaks would turn into stray spaces. -->
+    <p class="caption footer-copy">
+      <span>© {year}</span>
+      <a href={SITE.author.url} rel="noopener">
+        {SITE.author.name}
+      </a>
+      <span aria-hidden="true">//</span>
+      <a href={SITE.license.url} rel="noopener">
+        {SITE.license.name} License
+      </a>
+    </p>
+    <ul class="socials" aria-label="Elsewhere">
+      {SOCIALS.map((s) => (
+        <li>
+          <a href={s.url} rel={['noopener', s.rel].filter(Boolean).join(' ')} aria-label={s.label} title={s.label}>
+            <Icon name={s.icon} />
+          </a>
+        </li>
+      ))}
+    </ul>
+    <p class="caption footer-note">Public GitHub data only. Not affiliated with GitHub.</p>
+  </div>
+</footer>

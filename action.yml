@@ -1,0 +1,50 @@
+name: git-card
+description: Render git-card SVG cards (contribution skyline, F to SSS rank, stats) for a GitHub user into your repository.
+author: anistark
+branding:
+  icon: bar-chart-2
+  color: yellow
+
+inputs:
+  username:
+    description: GitHub username to render. Defaults to the owner of the repository running the workflow.
+    default: ${{ github.repository_owner }}
+  cards:
+    description: Comma-separated cards, or "all". skyline, rank, overview, streak, heatmap, languages, top-repos, orgs.
+    default: skyline,rank
+  theme:
+    description: auto, dark or light. Comma-separate to render several. The light theme is currently switched off, so every option renders dark.
+    default: auto
+  output:
+    description: Folder in your repository to write the SVGs to.
+    default: git-card
+  token:
+    description: Token used to read public GitHub data. The default workflow token is enough.
+    default: ${{ github.token }}
+
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@v4
+      with:
+        package_json_file: ${{ github.action_path }}/package.json
+
+    - uses: actions/setup-node@v5
+      with:
+        node-version: 24
+
+    - name: Install git-card
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: pnpm install --frozen-lockfile
+
+    - name: Render cards
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      env:
+        GITHUB_TOKEN: ${{ inputs.token }}
+        GC_USER: ${{ inputs.username }}
+        GC_CARDS: ${{ inputs.cards }}
+        GC_THEMES: ${{ inputs.theme }}
+        GC_OUT: ${{ github.workspace }}/${{ inputs.output }}
+      run: pnpm exec tsx scripts/generate.tsx --users "$GC_USER" --cards "$GC_CARDS" --themes "$GC_THEMES" --out "$GC_OUT" --flat

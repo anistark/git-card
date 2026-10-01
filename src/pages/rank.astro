@@ -1,0 +1,139 @@
+---
+// Generated from the same constants as the model in lib/rank.ts, so what this page says is what the code does.
+import { fmt } from '../lib/format';
+import { CATEGORIES, CORRELATION, ELITE, formatTop, METRICS, SPIKE, TIERS } from '../lib/rank';
+import Base from '../layouts/Base.astro';
+import { SITE } from '../site';
+
+export const prerender = true;
+
+// Share of developers inside each tier, best first.
+const tiers = TIERS.map((t, i) => ({ ...t, share: t.top - (TIERS[i - 1]?.top ?? 0), elite: ELITE.has(t.name) }));
+
+// What a metric alone needs for a z-score of 2.326, the top 1% on that metric by itself.
+const topOnePercent = (median: number, spread: number) => Math.round((median + 1) * Math.exp(2.326 * spread) - 1);
+const categoryLabel = Object.fromEntries(CATEGORIES.map((c) => [c.key, c.label]));
+const source = `${SITE.repo}/blob/main/src/lib/rank.ts`;
+---
+
+<Base
+  title="How the rank works · git-card"
+  description="git-card ranks GitHub profiles from F to SSS by estimated percentile among active developers. Here is exactly how the score is computed."
+>
+  <section class="rank-page">
+    <p class="eyebrow">The git-card rank</p>
+    <h1 class="display glitch rgb" data-text="F to SSS.">
+      F to <span class="neon">SSS.</span>
+    </h1>
+    <p class="lead">
+      Every profile gets a rank from F to SSS: an estimate of where it sits among active GitHub developers, built from seven public numbers.
+      S and above are the super elite, the top 1%.
+    </p>
+  </section>
+
+  <section class="rank-page">
+    <p class="eyebrow">Tiers</p>
+    <h2 class="title rgb">Nine tiers, by percentile.</h2>
+    <ol class="tier-ladder">
+      {tiers.map((t) => (
+        <li class:list={['tier hud', { elite: t.elite }]}>
+          <span class="tier-name">{t.name}</span>
+          <span class="tier-title">{t.title}</span>
+          <span class="tier-top caption tabular">{t.top < 1 ? `Top ${formatTop(t.top)}` : 'Everyone else'}</span>
+          <span class="tier-share caption tabular">{formatTop(t.share)} of developers</span>
+        </li>
+      ))}
+    </ol>
+  </section>
+
+  <section class="rank-page">
+    <p class="eyebrow">The method</p>
+    <h2 class="title rgb">How the score is computed.</h2>
+    <ol class="method">
+      <li>
+        <strong>Seven public metrics</strong>, grouped into impact, activity and collaboration. Private repositories never count.
+      </li>
+      <li>
+        <strong>Each is scored on a log scale</strong> against what a typical active developer has, because GitHub numbers are skewed: a few
+        people have a hundred thousand stars, most have a handful. The score is <code>(ln(value + 1) - ln(typical + 1)) / spread</code>, so
+        0 is typical and every spread above is a big step up.
+      </li>
+      <li>
+        <strong>The scores are averaged by weight</strong>, then rescaled for how much the metrics move together. Strong developers tend to
+        be strong at several things at once, so the model assumes a correlation of {CORRELATION} between any two metrics. Without this,
+        being good at everything would look far rarer than it is.
+      </li>
+      <li>
+        <strong>One exceptional category gets a bonus.</strong> If impact, activity or collaboration is more than {SPIKE.threshold} spreads
+        above typical, every spread beyond that adds {SPIKE.factor}. A legend in one dimension is not dragged down for being quiet in
+        another.
+      </li>
+      <li>
+        <strong>The result is read off a normal curve</strong> as an estimated top percentage, and that picks the tier.
+      </li>
+    </ol>
+  </section>
+
+  <section class="rank-page">
+    <p class="eyebrow">The numbers</p>
+    <h2 class="title rgb">Every weight, in the open.</h2>
+    <div class="table-wrap">
+      <table class="metric-table tabular">
+        <thead>
+          <tr>
+            <th scope="col">Metric</th>
+            <th scope="col">Category</th>
+            <th scope="col">Weight</th>
+            <th scope="col">Typical</th>
+            <th scope="col">Spread</th>
+            <th scope="col">Top 1% alone</th>
+            <th scope="col">Window</th>
+          </tr>
+        </thead>
+        <tbody>
+          {METRICS.map((m) => (
+            <tr>
+              <th scope="row">{m.label}</th>
+              <td>{categoryLabel[m.category]}</td>
+              <td>{Math.round(m.weight * 100)}%</td>
+              <td>{fmt(m.median)}</td>
+              <td>{m.spread}</td>
+              <td>
+                {m.key === 'activeDays'
+                  ? `${Math.min(365, topOnePercent(m.median, m.spread))} days`
+                  : fmt(topOnePercent(m.median, m.spread))}
+              </td>
+              <td>{m.window}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    <p class="caption">
+      "Top 1% alone" is what one metric needs on its own to sit in the top 1% for that metric. The rank itself needs a strong combination.
+    </p>
+  </section>
+
+  <section class="rank-page">
+    <p class="eyebrow">Fine print</p>
+    <h2 class="title rgb">It is an estimate.</h2>
+    <ul class="fine-print">
+      <li>
+        The typical values and spreads are informed estimates of the active GitHub population, not fitted to a sampled dataset. Treat the
+        percentage as a well-reasoned guess.
+      </li>
+      <li>
+        Only public data counts. Contributions to private repositories show up only as anonymous calendar counts, and only if the person
+        chose to show them on their profile.
+      </li>
+      <li>Activity metrics cover the last 12 months, so the rank moves as people ship, or stop shipping.</li>
+      <li>
+        The model is open source. Read{' '}
+        <a href={source} rel="noopener">
+          src/lib/rank.ts
+        </a>
+        , and if you think a weight is wrong, open a PR with your reasoning.
+      </li>
+    </ul>
+  </section>
+</Base>

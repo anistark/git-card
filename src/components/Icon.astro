@@ -1,0 +1,20 @@
+---
+// Brand marks from Simple Icons (CC0), read at build time so only these ship.
+import mastodon from 'simple-icons/icons/mastodon.svg?raw';
+import x from 'simple-icons/icons/x.svg?raw';
+import type { IconName } from '../site';
+
+interface Props {
+  name: IconName;
+  size?: number;
+}
+
+const { name, size = 18 } = Astro.props;
+
+const pathOf = (svg: string) => svg.match(/<path d="([^"]+)"/)?.[1] ?? '';
+const paths: Record<IconName, string> = { x: pathOf(x), mastodon: pathOf(mastodon) };
+---
+
+<svg class="icon" width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+  <path fill="currentColor" d={paths[name]} />
+</svg>

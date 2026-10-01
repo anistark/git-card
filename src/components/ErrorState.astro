@@ -1,0 +1,23 @@
+---
+import { href } from '../lib/urls';
+
+interface Props {
+  status: number;
+  message: string;
+}
+const { status, message } = Astro.props;
+const heading = status === 404 ? 'Signal lost.' : status === 429 ? 'Throttled.' : 'System fault.';
+---
+
+<section class="error hud">
+  <p class="eyebrow tabular">Error {status} // connection refused</p>
+  <h1 class="title glitch rgb" data-text={heading}>
+    {heading}
+  </h1>
+  <p class="lead">{message}</p>
+  <p>
+    <a class="btn" href={href('')}>
+      Try another handle
+    </a>
+  </p>
+</section>

@@ -1,0 +1,67 @@
+{
+  "name": "git-card",
+  "type": "module",
+  "version": "0.0.1",
+  "description": "Type a GitHub username, get a 3D contribution skyline and embeddable stat cards.",
+  "license": "MIT",
+  "author": "Ani (https://github.com/anistark)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anistark/git-card.git"
+  },
+  "homepage": "https://anistark.github.io/git-card/",
+  "bugs": "https://github.com/anistark/git-card/issues",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro",
+    "check": "astro check",
+    "test": "vitest run",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "cards": "tsx scripts/generate.tsx",
+    "og:site": "tsx scripts/generate.tsx --site-og public/og.png"
+  },
+  "dependencies": {
+    "@astrojs/react": "^7.0.0",
+    "@fontsource/chakra-petch": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "@resvg/resvg-wasm": "^2.6.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "astro": "^7.3.5",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.6.3",
+    "@types/three": "^0.186.0",
+    "eslint": "^10.11.0",
+    "eslint-plugin-astro": "^3.2.1",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.9",
+    "prettier-plugin-astro": "^1.1.0",
+    "sharp": "^0.35.5",
+    "simple-icons": "^16.33.0",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.0",
+    "vitest": "^5.0.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "workerd",
+      "sharp"
+    ]
+  },
+  "packageManager": "pnpm@10.15.1"
+}

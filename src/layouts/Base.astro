@@ -1,0 +1,107 @@
+---
+import '@fontsource/chakra-petch/latin-600.css';
+import '@fontsource/chakra-petch/latin-700.css';
+import '@fontsource/jetbrains-mono/latin-400.css';
+import '../styles/tokens.css';
+import '../styles/app.css';
+import { CARD_CSS, LIGHT_THEME, THEME_CSS } from '../cards/style';
+import Footer from '../components/Footer.astro';
+import Logo from '../components/Logo.astro';
+import { href } from '../lib/urls';
+
+interface Props {
+  title: string;
+  description: string;
+  noindex?: boolean;
+  /** Path of the link preview image, relative to the site root. */
+  image?: string;
+  imageAlt?: string;
+}
+
+const { title, description, noindex = false, image = 'og.png', imageAlt = title } = Astro.props;
+const canonical = new URL(Astro.url.pathname, Astro.site).href;
+const imageUrl = new URL(href(image), Astro.site).href;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    {noindex && <meta name="robots" content="noindex" />}
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={imageUrl} />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={imageAlt} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content={imageUrl} />
+    <meta name="twitter:image:alt" content={imageAlt} />
+    <meta name="color-scheme" content={LIGHT_THEME ? 'dark light' : 'dark'} />
+    <meta name="theme-color" content="#0A0A0C" />
+    <link rel="icon" href={href('favicon.ico')} sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href={href('favicon-32.png')} />
+    <link rel="apple-touch-icon" href={href('apple-touch-icon.png')} />
+    <link rel="manifest" href={href('site.webmanifest')} />
+    <script is:inline>
+      // Before first paint: ?embed strips the chrome for iframes, ?theme= locks the theme,
+      // otherwise a saved choice from the toggle wins over the system setting.
+      (function () {
+        const root = document.documentElement;
+        const params = new URLSearchParams(location.search);
+        if (params.has('embed')) root.classList.add('embed');
+        const forced = params.get('theme');
+        if (forced === 'dark' || forced === 'light') {
+          root.dataset.theme = forced;
+          return;
+        }
+        try {
+          const saved = localStorage.getItem('gc-theme');
+          if (saved === 'dark' || saved === 'light') root.dataset.theme = saved;
+        } catch {
+          // Storage can be blocked. The page then just follows the system theme.
+        }
+      })();
+    </script>
+    <style is:inline set:html={THEME_CSS + CARD_CSS}></style>
+  </head>
+  <body class="crt">
+    <header class="site-header">
+      <Logo />
+      <div class="header-right">
+        <span class="status caption" aria-hidden="true">
+          SYS.ONLINE
+        </span>
+        {LIGHT_THEME && (
+          <button class="btn-ghost" type="button" data-theme-toggle aria-label="Switch between night and day mode">
+            Night // Day
+          </button>
+        )}
+      </div>
+    </header>
+    <main class="site-main">
+      <slot />
+    </main>
+    <Footer />
+    <script>
+      document.querySelector('[data-theme-toggle]')?.addEventListener('click', () => {
+        const root = document.documentElement;
+        const current = root.dataset.theme ?? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+        const next = current === 'dark' ? 'light' : 'dark';
+        root.dataset.theme = next;
+        try {
+          localStorage.setItem('gc-theme', next);
+        } catch {
+          // Storage can be blocked. The choice then lasts for this page only.
+        }
+      });
+    </script>
+  </body>
+</html>
