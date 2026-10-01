@@ -238,6 +238,11 @@ function lastYearCounts(cc: RawUser['contributionsCollection']): Counts {
   return { commits, pullRequests, reviews, issues, total: commits + pullRequests + reviews + issues };
 }
 
+/** False when the contribution calendar could not be loaded, so calendar-based numbers would read as zero. */
+export function hasCalendar(p: Profile): boolean {
+  return p.weeks.some((w) => w.length > 0);
+}
+
 const zero = (): Counts => ({ commits: 0, pullRequests: 0, reviews: 0, issues: 0, total: 0 });
 
 /**

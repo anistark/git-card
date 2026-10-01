@@ -9,7 +9,7 @@
 // The medians and spreads are informed estimates, not fitted to a real population sample. The page that
 // explains the rank (/rank) is generated from these same constants, so the two cannot drift apart.
 
-import type { Profile } from './profile';
+import { hasCalendar, type Profile } from './profile';
 
 export type Category = 'impact' | 'activity' | 'collaboration';
 
@@ -154,6 +154,8 @@ export interface Rank {
   metrics: { key: string; label: string; value: number; z: number }[];
   /** The tier above, or null at SSS. */
   next: Tier | null;
+  /** False when the contribution calendar is missing, so contributions and active days read as zero. Do not show the tier then. */
+  complete: boolean;
 }
 
 /** Standard normal upper tail, P(Z > z), via erfc. Abramowitz and Stegun 7.1.26, error below 1.5e-7. */
@@ -207,6 +209,7 @@ export function rankProfile(p: Profile): Rank {
     categories,
     metrics: metrics.map(({ key, label, value, z: mz }) => ({ key, label, value, z: mz })),
     next: index > 0 ? TIERS[index - 1] : null,
+    complete: hasCalendar(p),
   };
 }
 

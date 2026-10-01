@@ -73,6 +73,8 @@ function readPalette(): Palette {
 }
 
 export function mountSkyline(host: HTMLElement, cells: Cell[], weeks: number, { onHover, onReady }: Options): () => void {
+  // No calendar, no city. Three.js also cannot build per-tile colors for an empty set.
+  if (!cells.length) return () => {};
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const renderer = new WebGLRenderer({ antialias: true });
@@ -139,8 +141,10 @@ export function mountSkyline(host: HTMLElement, cells: Cell[], weeks: number, { 
       .replace(
         '#include <emissivemap_fragment>',
         `#include <emissivemap_fragment>
-        totalEmissiveRadiance += vColor.rgb * uGlow;
-        totalEmissiveRadiance += vColor.rgb * vCrest * 0.9; // wave crests catch the light
+        #if defined( USE_COLOR ) || defined( USE_COLOR_ALPHA )
+          totalEmissiveRadiance += vColor.rgb * uGlow;
+          totalEmissiveRadiance += vColor.rgb * vCrest * 0.9; // wave crests catch the light
+        #endif
         totalEmissiveRadiance += uBeamColor * smoothstep( 1.4, 0.0, abs( vCityX - uBeamX ) );`,
       );
   };
@@ -175,7 +179,7 @@ export function mountSkyline(host: HTMLElement, cells: Cell[], weeks: number, { 
     const peak = palette.peak.clone().multiplyScalar(night ? 1.4 : 1); // brighter than the rest so bloom catches it, without a big halo
     // Empty days are sea, the peak day is a bright neon green tower, the rest use the cyan ramp.
     cells.forEach((cell, i) => mesh.setColorAt(i, cell[3] === 5 ? peak : cell[3] === 0 ? palette.sea : palette.levels[cell[3]]));
-    mesh.instanceColor!.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     scene.background = palette.surface;
     fog.color.copy(palette.surface);
     uniforms.uGlow.value = night ? 0.22 : 0;

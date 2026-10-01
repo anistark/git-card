@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest';
 import { leveller } from '../cards/levels';
 import { CARD_IDS, getCard } from '../cards/registry';
 import { truncate, wrap } from '../cards/shell';
-import { computeStreaks, groupByOwner, isValidLogin, normalize, ownershipSplit, type Day, type RawUser } from './profile';
+import { computeStreaks, groupByOwner, hasCalendar, isValidLogin, normalize, ownershipSplit, type Day, type RawUser } from './profile';
+import { rankProfile } from './rank';
 
 const NOW = new Date('2026-10-01T12:00:00Z');
 
@@ -243,7 +244,21 @@ describe('cards', () => {
       ),
       NOW,
     ),
+    // The calendar mirror failed: no days at all.
+    'no-calendar': normalize(rawUser([]), NOW),
   };
+
+  it('treats a profile without calendar days as incomplete', () => {
+    expect(hasCalendar(profiles['no-calendar'])).toBe(false);
+    expect(hasCalendar(profiles.active)).toBe(true);
+    expect(rankProfile(profiles['no-calendar']).complete).toBe(false);
+    expect(rankProfile(profiles.active).complete).toBe(true);
+  });
+
+  it.each(['skyline', 'heatmap', 'streak', 'rank'] as const)('shows %s as offline without a calendar', (id) => {
+    const svg = renderToStaticMarkup(createElement(getCard(id)!.Component, { profile: profiles['no-calendar'], standalone: true }));
+    expect(svg).toMatch(/CALENDAR OFFLINE/);
+  });
 
   for (const [kind, profile] of Object.entries(profiles)) {
     it.each(CARD_IDS)(`renders %s for an ${kind} profile as a standalone SVG`, (id) => {

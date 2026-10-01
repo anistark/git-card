@@ -1,6 +1,6 @@
-import type { Profile } from '../lib/profile';
+import { hasCalendar, type Profile } from '../lib/profile';
 import { heightOf, leveller, skylineFill } from './levels';
-import { PAD, SIZES, Shell, shortDate, type CardProps } from './shell';
+import { CalendarOffline, PAD, SIZES, Shell, shortDate, type CardProps } from './shell';
 
 // Oblique projection: weeks run right and slightly down, weekdays run left and down, height is up.
 const W = { x: 10, y: 2.4 };
@@ -41,6 +41,7 @@ export function SkylineCity({ profile, box, animate = true }: CityProps) {
   );
 
   const all = columns.flat().flatMap((col) => [...col.top, ...col.right, ...col.front]) as Pt[];
+  if (!all.length) return null; // no calendar: nothing to draw, and no bounds to fit
   const xs = all.map((p) => p[0]);
   const ys = all.map((p) => p[1]);
   const [minX, maxX, minY, maxY] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
@@ -119,7 +120,11 @@ export function SkylineCard(props: CardProps) {
           {shortDate(first)} {first.slice(0, 4)} to {shortDate(last)} {last.slice(0, 4)}
         </text>
       )}
-      <SkylineCity profile={profile} box={{ x: PAD, y: 92, w: width - PAD * 2, h: height - 92 - 52 }} />
+      {hasCalendar(profile) ? (
+        <SkylineCity profile={profile} box={{ x: PAD, y: 92, w: width - PAD * 2, h: height - 92 - 52 }} />
+      ) : (
+        <CalendarOffline width={width} height={height} />
+      )}
     </Shell>
   );
 }

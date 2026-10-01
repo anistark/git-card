@@ -168,7 +168,14 @@ export function ProfileOg({ profile, avatar }: { profile: Profile; avatar?: stri
       <Stat x={M} y={340} value={fmt(profile.totals.stars)} label="Stars earned" hero />
       <Stat x={M + 250} y={340} value={fmt(profile.totals.contributions)} label="Contributions" />
       <Stat x={M} y={460} value={`${profile.streaks.current}d`} label="Current streak" />
-      <Stat x={M + 250} y={460} value={`RANK ${rank.tier.name}`} label={formatStanding(rank.top)} hero={rank.elite} tone="gc-hot" />
+      <Stat
+        x={M + 250}
+        y={460}
+        value={rank.complete ? `RANK ${rank.tier.name}` : 'RANK ?'}
+        label={rank.complete ? formatStanding(rank.top) : 'Calendar offline'}
+        hero={rank.complete && rank.elite}
+        tone="gc-hot"
+      />
 
       <SkylineCity profile={profile} box={{ x: 590, y: 110, w: 560, h: 400 }} animate={false} />
     </Frame>

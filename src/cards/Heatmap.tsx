@@ -1,5 +1,6 @@
 import { leveller } from './levels';
-import { fmt, monthName, Neon, PAD, Shell, shortDate, WEEKDAYS, type CardProps } from './shell';
+import { hasCalendar } from '../lib/profile';
+import { CalendarOffline, fmt, monthName, Neon, PAD, Shell, shortDate, WEEKDAYS, type CardProps } from './shell';
 
 const STEP = 12;
 const CELL = 10;
@@ -8,6 +9,20 @@ const GRID_Y = 156;
 
 export function HeatmapCard(props: CardProps) {
   const { profile } = props;
+  if (!hasCalendar(profile)) {
+    return (
+      <Shell
+        {...props}
+        id="heatmap"
+        tag="CAL"
+        size="wide"
+        eyebrow="Contributions · last 12 months"
+        label="Contribution calendar unavailable"
+      >
+        <CalendarOffline width={760} height={400} />
+      </Shell>
+    );
+  }
   const level = leveller(profile);
   const busiest = profile.byWeekday.indexOf(Math.max(...profile.byWeekday));
 

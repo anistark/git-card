@@ -11,6 +11,8 @@ function profile(v: Partial<Record<(typeof METRICS)[number]['key'], number>>): P
     activeDays: v.activeDays ?? 0,
     lastYear: { reviews: v.reviews ?? 0 },
     owners: orgs,
+    // Any calendar at all, so the rank counts as complete.
+    weeks: [[{ date: '2026-01-01', count: 1, weekday: 4 }]],
   } as unknown as Profile;
 }
 

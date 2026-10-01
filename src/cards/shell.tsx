@@ -181,4 +181,26 @@ export function Meter({ x, y, width, fill, delay = 0 }: MeterProps) {
   );
 }
 
+/** In place of calendar-based content when the contribution calendar could not be loaded. */
+export function CalendarOffline({ width, height, note }: { width: number; height: number; note?: string }) {
+  return (
+    <g className="gc-a-fade">
+      <text
+        className="gc-accent gc-d"
+        x={width / 2}
+        y={height / 2 - 4}
+        textAnchor="middle"
+        fontSize={20}
+        fontWeight={700}
+        letterSpacing="0.16em"
+      >
+        CALENDAR OFFLINE
+      </text>
+      <text className="gc-muted" x={width / 2} y={height / 2 + 24} textAnchor="middle" fontSize={14}>
+        {note ?? 'The contribution calendar could not be loaded. Refresh in a minute.'}
+      </text>
+    </g>
+  );
+}
+
 export { fmt, maxChars, monthName, shortDate, truncate, WEEKDAYS, wrap } from '../lib/format';

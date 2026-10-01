@@ -1,7 +1,19 @@
-import { Neon, PAD, SIZES, Shell, shortDate, WEEKDAYS, type CardProps } from './shell';
+import { hasCalendar } from '../lib/profile';
+import { CalendarOffline, Neon, PAD, SIZES, Shell, shortDate, WEEKDAYS, type CardProps } from './shell';
 
 export function StreakCard(props: CardProps) {
   const { profile } = props;
+  if (!hasCalendar(profile)) {
+    return (
+      <Shell {...props} id="streak" tag="STR" size="standard" eyebrow="Streak" label="Streak unavailable: contribution calendar offline">
+        <CalendarOffline
+          width={SIZES.standard.width}
+          height={SIZES.standard.height}
+          note="Streaks need the contribution calendar. Refresh in a minute."
+        />
+      </Shell>
+    );
+  }
   const { current, longest, longestStart, longestEnd } = profile.streaks;
   const inner = SIZES.standard.width - PAD * 2;
   const right = PAD + inner * 0.56;

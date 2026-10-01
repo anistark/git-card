@@ -4,6 +4,19 @@ import { formatStanding, type Rank } from '../lib/rank';
 import { urls } from '../lib/urls';
 
 export function RankBadge({ login, rank }: { login: string; rank: Rank }) {
+  if (!rank.complete) {
+    return (
+      <a
+        className="rank-badge"
+        href={urls.card(login, 'rank')}
+        title="The rank needs the contribution calendar, which could not be loaded. Refresh in a minute."
+      >
+        <span className="rank-label">Rank</span>
+        <span className="rank-tier">?</span>
+        <span className="rank-top tabular">Calendar offline</span>
+      </a>
+    );
+  }
   return (
     <a
       className={rank.elite ? 'rank-badge elite' : 'rank-badge'}

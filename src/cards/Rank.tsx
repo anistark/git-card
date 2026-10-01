@@ -6,15 +6,17 @@ export function RankCard(props: CardProps) {
   const { profile } = props;
   const rank = rankProfile(profile);
   const { width } = SIZES.wide;
+  // Without the calendar, contributions and active days read as zero and the tier would be wrong. Show none.
+  const pending = !rank.complete;
   const right = width - PAD;
   const panel = 352; // x where the right-hand panel starts
   const panelW = right - panel;
 
   // Tier letters shrink to fit: one letter is huge, three still fit the left panel.
-  const letters = rank.tier.name;
+  const letters = pending ? '?' : rank.tier.name;
   const size = letters.length === 1 ? 176 : letters.length === 2 ? 150 : 120;
   const baseline = 160 + size * 0.5;
-  const tone = rank.elite ? 'gc-accent' : rank.tier.name === 'F' || rank.tier.name === 'E' ? 'gc-muted' : 'gc-fg';
+  const tone = pending ? 'gc-muted' : rank.elite ? 'gc-accent' : rank.tier.name === 'F' || rank.tier.name === 'E' ? 'gc-muted' : 'gc-fg';
 
   // Ladder, worst to best, left to right.
   const ladder = [...TIERS].reverse();
@@ -29,11 +31,15 @@ export function RankCard(props: CardProps) {
       tag="RNK"
       size="wide"
       eyebrow="Rank · F to SSS"
-      label={`Rank ${rank.tier.name} (${rank.tier.title}): estimated ${formatStanding(rank.top).toLowerCase()} of active GitHub developers`}
+      label={
+        pending
+          ? 'Rank pending: contribution calendar offline'
+          : `Rank ${rank.tier.name} (${rank.tier.title}): estimated ${formatStanding(rank.top).toLowerCase()} of active GitHub developers`
+      }
     >
       {/* Left: the tier. */}
       <g className="gc-a-rise">
-        {rank.elite && (
+        {rank.elite && !pending && (
           <g>
             <rect className="gc-hot" x={PAD} y={64} width={112} height={20} />
             <text className="gc-d gc-on-fill" x={PAD + 56} y={78} fontSize={11} fontWeight={700} letterSpacing="0.2em" textAnchor="middle">
@@ -53,13 +59,17 @@ export function RankCard(props: CardProps) {
           {letters}
         </Neon>
         <text className="gc-fg gc-d" x={PAD} y={292} fontSize={20} fontWeight={700} letterSpacing="0.12em">
-          {rank.tier.title.toUpperCase()}
+          {pending ? 'PENDING' : rank.tier.title.toUpperCase()}
         </text>
         <text className="gc-accent gc-num gc-d gc-glow" x={PAD} y={324} fontSize={22} fontWeight={700}>
-          {formatStanding(rank.top).toUpperCase()}
+          {pending ? 'CALENDAR OFFLINE' : formatStanding(rank.top).toUpperCase()}
         </text>
         <text className="gc-muted" x={PAD} y={346} fontSize={13}>
-          {rank.next ? `Next: ${rank.next.name} at top ${formatTop(rank.next.top)}` : 'Maximum rank'}
+          {pending
+            ? 'Refresh in a minute to rank.'
+            : rank.next
+              ? `Next: ${rank.next.name} at top ${formatTop(rank.next.top)}`
+              : 'Maximum rank'}
         </text>
       </g>
 
@@ -96,7 +106,7 @@ export function RankCard(props: CardProps) {
         )}
         {ladder.map((t, i) => {
           const x = ladderX + i * (cell.w + cell.gap);
-          const current = t.name === rank.tier.name;
+          const current = !pending && t.name === rank.tier.name;
           return (
             <g key={t.name}>
               <rect className={current ? (rank.elite ? 'gc-hot' : 'gc-data') : 'gc-track'} x={x} y={290} width={cell.w} height={30} />

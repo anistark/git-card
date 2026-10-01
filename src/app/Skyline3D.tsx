@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { skylineCells } from '../cards/levels';
 import { shortDate } from '../lib/format';
-import type { Profile } from '../lib/profile';
+import { hasCalendar, type Profile } from '../lib/profile';
 
 const supportsWebGL = () => {
   try {
@@ -48,6 +48,9 @@ export function Skyline3D({ profile }: { profile: Profile }) {
       dispose?.();
     };
   }, [profile]);
+
+  // No calendar: the SVG card underneath shows "calendar offline", so there is nothing to draw on top of it.
+  if (!hasCalendar(profile)) return null;
 
   return (
     <div

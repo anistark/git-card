@@ -394,10 +394,13 @@ export async function fetchPublicProfile(login: string, opts: FetchOptions = {})
   const now = opts.now ?? new Date();
   const { sources, warnings } = await fetchSources(login, opts);
   const profile = normalize(toRawUser(sources, now), now);
-  try {
-    localStorage.setItem(key, JSON.stringify({ at: Date.now(), profile, warnings }));
-  } catch {
-    // Storage full or blocked. The next visit fetches again.
+  // Only cache complete profiles, so a calendar or search hiccup is retried on the next load, not kept for an hour.
+  if (!warnings.length) {
+    try {
+      localStorage.setItem(key, JSON.stringify({ at: Date.now(), profile, warnings }));
+    } catch {
+      // Storage full or blocked. The next visit fetches again.
+    }
   }
   return { profile, warnings };
 }
