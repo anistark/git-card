@@ -1,3 +1,4 @@
+import { hasCalendar } from '../lib/profile';
 import { fmt, maxChars, Neon, PAD, SIZES, Shell, truncate, wrap, type CardProps } from './shell';
 
 export function OverviewCard(props: CardProps) {
@@ -7,10 +8,12 @@ export function OverviewCard(props: CardProps) {
   const name = truncate((profile.name || profile.login).toUpperCase(), maxChars(inner, 40));
   const sub = [`ID ${profile.login}`, profile.location && `LOC ${profile.location}`].filter(Boolean).join(' // ');
   const bio = profile.bio ? wrap(profile.bio, maxChars(inner, 15), 2) : [];
+  // The total comes with the calendar: dots while it loads, a question mark if it never does.
+  const contributions = hasCalendar(profile) ? fmt(profile.totals.contributions) : props.calendarLoading ? '...' : '?';
 
   const stats = [
     { label: 'Stars earned', value: fmt(profile.totals.stars), hero: true },
-    { label: 'Contributions', value: fmt(profile.totals.contributions) },
+    { label: 'Contributions', value: contributions },
     { label: 'Followers', value: fmt(profile.followers) },
     { label: 'Public repos', value: fmt(profile.totals.repos) },
     { label: 'Pull requests', value: fmt(profile.totals.pullRequests) },

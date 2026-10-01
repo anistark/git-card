@@ -4,7 +4,7 @@ import { rankProfile } from '../lib/rank';
 import { CardFigure } from './CardFigure';
 import { OrgSection } from './OrgSection';
 import { ProfileHeader } from './ProfileHeader';
-import { ErrorView, Lookup, Scanning, Warnings } from './Status';
+import { CalendarStatus, ErrorView, Lookup, Scanning, Warnings } from './Status';
 import { useParam, useProfile } from './useProfile';
 
 /** /u/?user=login: the whole dashboard, built in the browser from public APIs. */
@@ -21,19 +21,22 @@ export default function ProfileApp() {
   if (state.status === 'loading') return <Scanning login={state.login} steps={state.steps} />;
   if (state.status === 'error') return <ErrorView login={state.login} error={state.error} />;
 
-  const { profile, warnings } = state;
+  const { profile, warnings, calendar, calendarSource, calendarAttempt } = state;
+  const calendarLoading = calendar === 'loading';
   return (
     <>
-      <ProfileHeader profile={profile} rank={rank!} />
+      <ProfileHeader profile={profile} rank={rank!} calendarLoading={calendarLoading} />
       <Warnings warnings={warnings} />
+      {calendarLoading && <CalendarStatus attempt={calendarAttempt} />}
       <div className="cards">
         {cardsIn('main').map((id) => (
-          <CardFigure key={id} profile={profile} card={id} />
+          <CardFigure key={id} profile={profile} card={id} calendarLoading={calendarLoading} />
         ))}
       </div>
       <OrgSection profile={profile} />
       <p className="caption fetched">
-        Public GitHub data, fetched by your browser at {new Date(profile.fetchedAt).toLocaleString()} and cached for an hour.{' '}
+        Public GitHub data, fetched by your browser at {new Date(profile.fetchedAt).toLocaleString()} and cached for an hour.
+        {calendarSource ? ` Calendar via ${calendarSource}.` : ''}{' '}
         <button type="button" className="btn-ghost refresh" onClick={reload}>
           Refresh
         </button>

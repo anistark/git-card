@@ -3,17 +3,21 @@ import type { Profile } from '../lib/profile';
 import { formatStanding, type Rank } from '../lib/rank';
 import { urls } from '../lib/urls';
 
-export function RankBadge({ login, rank }: { login: string; rank: Rank }) {
+export function RankBadge({ login, rank, calendarLoading }: { login: string; rank: Rank; calendarLoading?: boolean }) {
   if (!rank.complete) {
     return (
       <a
-        className="rank-badge"
+        className={calendarLoading ? 'rank-badge scanning' : 'rank-badge'}
         href={urls.card(login, 'rank')}
-        title="The rank needs the contribution calendar, which could not be loaded. Refresh in a minute."
+        title={
+          calendarLoading
+            ? 'The rank needs the contribution calendar, which is still loading.'
+            : 'The rank needs the contribution calendar, which could not be loaded. Refresh in a minute.'
+        }
       >
         <span className="rank-label">Rank</span>
         <span className="rank-tier">?</span>
-        <span className="rank-top tabular">Calendar offline</span>
+        <span className="rank-top tabular">{calendarLoading ? 'Scanning calendar' : 'Calendar offline'}</span>
       </a>
     );
   }
@@ -30,7 +34,7 @@ export function RankBadge({ login, rank }: { login: string; rank: Rank }) {
   );
 }
 
-export function ProfileHeader({ profile, rank }: { profile: Profile; rank: Rank }) {
+export function ProfileHeader({ profile, rank, calendarLoading }: { profile: Profile; rank: Rank; calendarLoading?: boolean }) {
   const display = profile.name || profile.login;
   const hud = [
     `ONLINE SINCE ${profile.createdAt.slice(0, 4)}`,
@@ -53,7 +57,7 @@ export function ProfileHeader({ profile, rank }: { profile: Profile; rank: Rank 
         {profile.bio && <p className="caption profile-bio">{profile.bio}</p>}
       </div>
       <div className="profile-side">
-        <RankBadge login={profile.login} rank={rank} />
+        <RankBadge login={profile.login} rank={rank} calendarLoading={calendarLoading} />
         <a className="btn btn-ghost" href={`https://github.com/${profile.login}`} rel="noopener">
           GitHub ↗
         </a>

@@ -25,6 +25,8 @@ export interface CardProps {
   theme?: Theme;
   /** True when the SVG is served on its own (an <img> in a README). It then carries its own tokens. */
   standalone?: boolean;
+  /** The calendar is still on its way: calendar cards show a scanning state instead of saying it is offline. */
+  calendarLoading?: boolean;
 }
 
 export const SIZES = {
@@ -182,7 +184,9 @@ export function Meter({ x, y, width, fill, delay = 0 }: MeterProps) {
 }
 
 /** In place of calendar-based content when the contribution calendar could not be loaded. */
-export function CalendarOffline({ width, height, note }: { width: number; height: number; note?: string }) {
+/** Stands in for calendar-based art: a scanning state while the calendar loads, or a notice that it could not. */
+export function CalendarOffline({ width, height, note, loading }: { width: number; height: number; note?: string; loading?: boolean }) {
+  const cells = 9;
   return (
     <g className="gc-a-fade">
       <text
@@ -194,11 +198,26 @@ export function CalendarOffline({ width, height, note }: { width: number; height
         fontWeight={700}
         letterSpacing="0.16em"
       >
-        CALENDAR OFFLINE
+        {loading ? 'SCANNING CALENDAR' : 'CALENDAR OFFLINE'}
       </text>
       <text className="gc-muted" x={width / 2} y={height / 2 + 24} textAnchor="middle" fontSize={14}>
-        {note ?? 'The contribution calendar could not be loaded. Refresh in a minute.'}
+        {loading ? 'Contribution data is on its way.' : (note ?? 'The contribution calendar could not be loaded. Refresh in a minute.')}
       </text>
+      {loading && (
+        <g aria-hidden="true">
+          {Array.from({ length: cells }, (_, i) => (
+            <rect
+              key={i}
+              className="gc-data gc-a-blink"
+              x={width / 2 - (cells * 14) / 2 + i * 14 + 2}
+              y={height / 2 + 44}
+              width={10}
+              height={6}
+              style={{ animationDelay: `${i * 110}ms` }}
+            />
+          ))}
+        </g>
+      )}
     </g>
   );
 }

@@ -8,6 +8,7 @@ export function RankCard(props: CardProps) {
   const { width } = SIZES.wide;
   // Without the calendar, contributions and active days read as zero and the tier would be wrong. Show none.
   const pending = !rank.complete;
+  const loading = pending && props.calendarLoading;
   const right = width - PAD;
   const panel = 352; // x where the right-hand panel starts
   const panelW = right - panel;
@@ -33,7 +34,7 @@ export function RankCard(props: CardProps) {
       eyebrow="Rank · F to SSS"
       label={
         pending
-          ? 'Rank pending: contribution calendar offline'
+          ? `Rank pending: contribution calendar ${loading ? 'loading' : 'offline'}`
           : `Rank ${rank.tier.name} (${rank.tier.title}): estimated ${formatStanding(rank.top).toLowerCase()} of active GitHub developers`
       }
     >
@@ -62,14 +63,16 @@ export function RankCard(props: CardProps) {
           {pending ? 'PENDING' : rank.tier.title.toUpperCase()}
         </text>
         <text className="gc-accent gc-num gc-d gc-glow" x={PAD} y={324} fontSize={22} fontWeight={700}>
-          {pending ? 'CALENDAR OFFLINE' : formatStanding(rank.top).toUpperCase()}
+          {loading ? 'SCANNING CALENDAR' : pending ? 'CALENDAR OFFLINE' : formatStanding(rank.top).toUpperCase()}
         </text>
         <text className="gc-muted" x={PAD} y={346} fontSize={13}>
-          {pending
-            ? 'Refresh in a minute to rank.'
-            : rank.next
-              ? `Next: ${rank.next.name} at top ${formatTop(rank.next.top)}`
-              : 'Maximum rank'}
+          {loading
+            ? 'Ranks as soon as the calendar lands.'
+            : pending
+              ? 'Refresh in a minute to rank.'
+              : rank.next
+                ? `Next: ${rank.next.name} at top ${formatTop(rank.next.top)}`
+                : 'Maximum rank'}
         </text>
       </g>
 

@@ -1,3 +1,4 @@
+import type { CalendarAttempt } from '../lib/calendar';
 import type { Step } from '../lib/public-api';
 import { PublicApiError } from '../lib/public-api';
 import { href, urls } from '../lib/urls';
@@ -71,6 +72,20 @@ export function Warnings({ warnings }: { warnings: string[] }) {
           <li key={w}>{w}</li>
         ))}
       </ul>
+    </aside>
+  );
+}
+
+/** Shown only once the first calendar source needed a retry or a fallback, so a quick load never flashes it. */
+export function CalendarStatus({ attempt }: { attempt?: CalendarAttempt }) {
+  if (!attempt || (attempt.index === 1 && attempt.attempt === 1)) return null;
+  const which = attempt.index === 1 ? 'Primary source' : `Backup source ${attempt.index - 1} of ${attempt.sources - 1}`;
+  return (
+    <aside className="warnings calendar-status" role="status" aria-live="polite">
+      <p className="eyebrow">Calendar // rerouting</p>
+      <p className="caption tabular">
+        {which}, {attempt.source}, attempt {attempt.attempt} of {attempt.attempts}
+      </p>
     </aside>
   );
 }

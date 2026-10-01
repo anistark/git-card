@@ -5,10 +5,20 @@ export function StreakCard(props: CardProps) {
   const { profile } = props;
   if (!hasCalendar(profile)) {
     return (
-      <Shell {...props} id="streak" tag="STR" size="standard" eyebrow="Streak" label="Streak unavailable: contribution calendar offline">
+      <Shell
+        {...props}
+        id="streak"
+        tag="STR"
+        size="standard"
+        eyebrow="Streak"
+        label={
+          props.calendarLoading ? 'Streak loading: contribution calendar on its way' : 'Streak unavailable: contribution calendar offline'
+        }
+      >
         <CalendarOffline
           width={SIZES.standard.width}
           height={SIZES.standard.height}
+          loading={props.calendarLoading}
           note="Streaks need the contribution calendar. Refresh in a minute."
         />
       </Shell>

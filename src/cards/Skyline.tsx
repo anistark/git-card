@@ -123,7 +123,7 @@ export function SkylineCard(props: CardProps) {
       {hasCalendar(profile) ? (
         <SkylineCity profile={profile} box={{ x: PAD, y: 92, w: width - PAD * 2, h: height - 92 - 52 }} />
       ) : (
-        <CalendarOffline width={width} height={height} />
+        <CalendarOffline width={width} height={height} loading={props.calendarLoading} />
       )}
     </Shell>
   );

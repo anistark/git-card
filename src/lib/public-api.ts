@@ -2,16 +2,17 @@
 //
 //   GitHub REST     /users/:login, /users/:login/orgs        60 requests an hour per visitor
 //   GitHub search   repos, commits, PRs, reviews, issues     10 searches a minute per visitor
-//   Calendar        github-contributions-api.jogruber.de     public mirror of the contribution calendar
+//   Calendar        public mirrors, with fallbacks           see calendar.ts
 //
 // GitHub's own calendar and GraphQL API are not usable from a browser without a token, so the calendar comes
-// from a public mirror. Everything is shaped into the same RawUser that normalize() takes, so the cards,
+// from third parties. It is often the slowest part, so the rest of the profile is handed over first and the
+// calendar fills in after. Everything is shaped into the same RawUser that normalize() takes, so the cards,
 // the rank and the org grouping do not care where the data came from.
 
+import { fetchCalendar, type Calendar, type CalendarAttempt } from './calendar';
 import { normalize, type Profile, type RawUser } from './profile';
 
 const API = 'https://api.github.com';
-const CALENDAR = 'https://github-contributions-api.jogruber.de/v4';
 const SAMPLE = 100; // items fetched per activity search, used for the org breakdown
 const OWNER_LOOKUPS = 10; // most extra /users calls spent classifying repo owners as org or user
 
@@ -35,12 +36,26 @@ export interface FetchOptions {
   fetch?: typeof fetch;
   now?: Date;
   timeoutMs?: number;
+  /** Calendar retries, injected in tests. */
+  calendarRetryDelayMs?: number;
+  /**
+   * Called once with everything but the calendar, when the calendar is the only part still loading. The final
+   * profile, calendar included, is what the returned promise resolves with.
+   */
+  onPartial?: (partial: PublicProfile) => void;
+  /** Each calendar source and attempt, as it starts. */
+  onCalendarAttempt?: (a: CalendarAttempt) => void;
 }
+
+export type CalendarState = 'loading' | 'ready' | 'offline';
 
 export interface PublicProfile {
   profile: Profile;
   /** Parts that could not be loaded, shown to the visitor instead of failing the whole page. */
   warnings: string[];
+  calendar: CalendarState;
+  /** Host that served the calendar. */
+  calendarSource?: string;
 }
 
 // ---- Raw API shapes, only the fields used ----------------------------------------------
@@ -91,16 +106,11 @@ interface Search<T> {
   items: T[];
 }
 
-export interface CalendarResponse {
-  total: { lastYear?: number } & Record<string, number>;
-  contributions: { date: string; count: number }[];
-}
-
 export interface PublicSources {
   user: RestUser;
   orgs: RestOwner[];
   repos: Search<SearchRepo>;
-  calendar: CalendarResponse | null;
+  calendar: Calendar | null;
   commits: Search<SearchCommit> | null;
   pullRequests: Search<SearchIssue> | null;
   reviews: Search<SearchIssue> | null;
@@ -111,7 +121,7 @@ export interface PublicSources {
 
 // ---- Fetching ------------------------------------------------------------------------------
 
-/** Longest any one request may take. The calendar mirror in particular can stall for a minute or more. */
+/** Longest any one GitHub request may take. Calendar sources have their own, shorter limit and retries. */
 const TIMEOUT_MS = 30_000;
 
 async function get<T>(url: string, opts: FetchOptions, timeoutMs = opts.timeoutMs ?? TIMEOUT_MS): Promise<T> {
@@ -155,7 +165,12 @@ async function optional<T>(label: string, warnings: string[], run: () => Promise
   }
 }
 
-export async function fetchSources(login: string, opts: FetchOptions = {}): Promise<{ sources: PublicSources; warnings: string[] }> {
+export async function fetchSources(
+  login: string,
+  opts: FetchOptions = {},
+  /** Called with everything but the calendar, if the calendar is still loading once the rest is done. */
+  onRest?: (sources: PublicSources, warnings: string[]) => void,
+): Promise<{ sources: PublicSources; warnings: string[] }> {
   const warnings: string[] = [];
   const step = opts.onStep ?? (() => {});
   const since = iso(new Date((opts.now ?? new Date()).getTime() - 365 * 86_400_000));
@@ -170,11 +185,19 @@ export async function fetchSources(login: string, opts: FetchOptions = {}): Prom
   });
   step('profile', 'done');
 
-  // The calendar lives on another host and is often the slowest call, so it runs alongside GitHub's.
+  // The calendar lives on other hosts and is often the slowest part, so it runs alongside GitHub's.
   step('calendar', 'start');
+  let calendarSettled = false;
   const calendarPromise = optional('Contribution calendar', warnings, () =>
-    get<CalendarResponse>(`${CALENDAR}/${user.login}?y=last`, opts),
+    fetchCalendar(user.login, {
+      signal: opts.signal,
+      fetch: opts.fetch,
+      timeoutMs: opts.timeoutMs,
+      retryDelayMs: opts.calendarRetryDelayMs,
+      onAttempt: opts.onCalendarAttempt,
+    }),
   ).then((c) => {
+    calendarSettled = true;
     step('calendar', c ? 'done' : 'failed');
     return c;
   });
@@ -201,9 +224,11 @@ export async function fetchSources(login: string, opts: FetchOptions = {}): Prom
     (await optional('Organization memberships', warnings, () => get<RestOwner[]>(`${API}/users/${user.login}/orgs`, opts))) ?? [];
   const ownerTypes = await classifyOwners(user, orgs, commits, [pullRequests, reviews, issues], opts);
   step('orgs', 'done');
-  const calendar = await calendarPromise;
 
-  return { sources: { user, orgs, repos, calendar, commits, pullRequests, reviews, issues, ownerTypes }, warnings };
+  const rest = { user, orgs, repos, commits, pullRequests, reviews, issues, ownerTypes };
+  if (!calendarSettled) onRest?.({ ...rest, calendar: null }, [...warnings]);
+  const calendar = await calendarPromise;
+  return { sources: { ...rest, calendar }, warnings };
 }
 
 /** Works out whether each repo owner is an organization. Free where commit results or memberships say so. */
@@ -327,7 +352,7 @@ export function toRawUser(s: PublicSources, now = new Date()): RawUser {
       .filter((i) => !recentOnly || i.created_at.slice(0, 10) >= since)
       .map((i) => ({ owner: ownerOf(i.repository_url), name: repoOf(i.repository_url) }));
 
-  // The calendar mirror can include a few days past "today" in some timezones; keep the last 371 at most.
+  // Calendar sources can include a few days past "today" in some timezones; keep the last 371 at most.
   const days = (s.calendar?.contributions ?? []).filter((d) => d.date <= iso(now)).slice(-371);
   const recentPrs = issueItems(s.pullRequests, true);
 
@@ -366,7 +391,7 @@ export function toRawUser(s: PublicSources, now = new Date()): RawUser {
       totalPullRequestReviewContributions: s.reviews?.total_count ?? 0,
       totalIssueContributions: s.issues?.total_count ?? 0,
       contributionCalendar: {
-        totalContributions: s.calendar?.total.lastYear ?? days.reduce((n, d) => n + d.count, 0),
+        totalContributions: s.calendar?.total ?? days.reduce((n, d) => n + d.count, 0),
         weeks: calendarWeeks(days),
       },
       commitContributionsByRepository: byRepository(genuineCommits(s), s.ownerTypes),
@@ -379,28 +404,35 @@ export function toRawUser(s: PublicSources, now = new Date()): RawUser {
 
 // ---- Entry point with a short-lived local cache ------------------------------------------------
 
-const CACHE_PREFIX = 'gc:profile:v1:';
+export const CACHE_PREFIX = 'gc:profile:v1:';
 const TTL_MS = 60 * 60 * 1000;
 
 export async function fetchPublicProfile(login: string, opts: FetchOptions = {}): Promise<PublicProfile> {
   const key = CACHE_PREFIX + login.toLowerCase();
   try {
     const cached = JSON.parse(localStorage.getItem(key) ?? 'null') as (PublicProfile & { at: number }) | null;
-    if (cached && Date.now() - cached.at < TTL_MS) return { profile: cached.profile, warnings: cached.warnings };
+    if (cached && Date.now() - cached.at < TTL_MS) return { ...cached, calendar: 'ready' };
   } catch {
     // No storage, or a stale shape. Fetch fresh.
   }
 
   const now = opts.now ?? new Date();
-  const { sources, warnings } = await fetchSources(login, opts);
-  const profile = normalize(toRawUser(sources, now), now);
+  const { sources, warnings } = await fetchSources(login, opts, (rest, partialWarnings) =>
+    opts.onPartial?.({ profile: normalize(toRawUser(rest, now), now), warnings: partialWarnings, calendar: 'loading' }),
+  );
+  const result: PublicProfile = {
+    profile: normalize(toRawUser(sources, now), now),
+    warnings,
+    calendar: sources.calendar ? 'ready' : 'offline',
+    calendarSource: sources.calendar?.source,
+  };
   // Only cache complete profiles, so a calendar or search hiccup is retried on the next load, not kept for an hour.
   if (!warnings.length) {
     try {
-      localStorage.setItem(key, JSON.stringify({ at: Date.now(), profile, warnings }));
+      localStorage.setItem(key, JSON.stringify({ ...result, at: Date.now() }));
     } catch {
       // Storage full or blocked. The next visit fetches again.
     }
   }
-  return { profile, warnings };
+  return result;
 }

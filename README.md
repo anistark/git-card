@@ -95,8 +95,8 @@ The workflow reads the site URL and base path from `actions/configure-pages`, so
 
 ```text
              browser                                          GitHub Actions
- REST + search + calendar mirror                            GraphQL, free token
-     lib/public-api.ts                                         lib/github.ts
+ REST + search + calendar sources                           GraphQL, free token
+  lib/public-api.ts + lib/calendar.ts                          lib/github.ts
             │                                                        │
             └──────────────▶ normalize() ──▶ Profile ◀───────────────┘
                                                │
@@ -125,7 +125,7 @@ Seven public metrics are each scored on a log scale against a typical active dev
 ## Limits worth knowing
 
 - **Rate limits.** Without signing in, GitHub allows each visitor 60 API requests an hour and 10 searches a minute. A profile takes about 8 requests and 5 searches, and stays cached in the browser for an hour.
-- **The contribution calendar** comes from a public mirror, [github-contributions-api](https://github.com/grubersjoe/github-contributions-api), because GitHub's own calendar cannot be read from a browser. If it is down, the calendar cards say so and the rest still loads.
+- **The contribution calendar** cannot be read from GitHub in a browser, so it comes from public sources, tried in order: [github-contributions-api](https://github.com/grubersjoe/github-contributions-api), [gh-calendar](https://github.com/rschristian/gh-calendar), then GitHub's own calendar page through the [Jina reader](https://jina.ai/reader) and [cors.lol](https://cors.lol). Each source gets three attempts before the next takes over, and one that just failed is tried last for 15 minutes. The rest of the profile shows first and the calendar cards fill in when it lands. If every source fails, they say so.
 - **Approximations in the browser.** Languages are each repo's main language weighted by repo size. The org breakdown counts the most recent 100 commits, pull requests, reviews and issues, and only counts commits in repos where the work plausibly happened, to skip forks and mirrors. The Action uses GraphQL and is exact.
 - **Organizations** cannot be looked up as profiles yet. Only user accounts.
 - Contribution data covers the last 365 days.

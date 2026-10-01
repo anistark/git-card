@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Profile } from '../lib/profile';
 import { isValidLogin } from '../lib/profile';
-import { fetchPublicProfile, PublicApiError, type Step } from '../lib/public-api';
+import type { CalendarAttempt } from '../lib/calendar';
+import { CACHE_PREFIX, fetchPublicProfile, PublicApiError, type CalendarState, type Step } from '../lib/public-api';
 
 export type StepState = 'start' | 'done' | 'failed';
 
@@ -9,7 +10,16 @@ export type ProfileState =
   | { status: 'empty' }
   | { status: 'loading'; login: string; steps: Partial<Record<Step, StepState>> }
   | { status: 'error'; login: string; error: PublicApiError | Error }
-  | { status: 'ready'; profile: Profile; warnings: string[] };
+  | {
+      status: 'ready';
+      profile: Profile;
+      warnings: string[];
+      /** 'loading' while the rest of the profile is shown and the calendar is still on its way. */
+      calendar: CalendarState;
+      calendarSource?: string;
+      /** The calendar source and attempt in progress, while loading. */
+      calendarAttempt?: CalendarAttempt;
+    };
 
 /** Read a query parameter once. Pages are static, so the URL is the only input. */
 export function useParam(name: string): string | null {
@@ -28,11 +38,18 @@ export function useProfile(login: string | null): [ProfileState, () => void] {
     }
     const ctrl = new AbortController();
     setState({ status: 'loading', login, steps: {} });
+    let attempt: CalendarAttempt | undefined;
     fetchPublicProfile(login, {
       signal: ctrl.signal,
       onStep: (step, s) => setState((prev) => (prev.status === 'loading' ? { ...prev, steps: { ...prev.steps, [step]: s } } : prev)),
+      // Show the profile as soon as only the calendar is missing. Its cards fill in when it lands.
+      onPartial: (partial) => setState({ status: 'ready', ...partial, calendarAttempt: attempt }),
+      onCalendarAttempt: (a) => {
+        attempt = a;
+        setState((prev) => (prev.status === 'ready' && prev.calendar === 'loading' ? { ...prev, calendarAttempt: a } : prev));
+      },
     })
-      .then(({ profile, warnings }) => setState({ status: 'ready', profile, warnings }))
+      .then((result) => setState({ status: 'ready', ...result }))
       .catch((error: Error) => {
         if (error.name !== 'AbortError') setState({ status: 'error', login, error });
       });
@@ -42,7 +59,7 @@ export function useProfile(login: string | null): [ProfileState, () => void] {
   const reload = useCallback(() => {
     if (!login) return;
     try {
-      localStorage.removeItem(`gc:profile:v1:${login.toLowerCase()}`);
+      localStorage.removeItem(CACHE_PREFIX + login.toLowerCase());
     } catch {
       // Storage blocked: there is no cache to clear.
     }

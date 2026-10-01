@@ -27,6 +27,7 @@ Consult these guides before working on related tasks:
 - The README card generator (`scripts/generate.tsx`, used by `action.yml` and the Pages workflow) runs in GitHub Actions with a free token and uses GraphQL via `src/lib/github.ts`. Both paths must end in `normalize()` so cards see the same `Profile`.
 - All internal links go through `src/lib/urls.ts`, because the site lives under a base path (`/git-card/`). Never hardcode `/u/...` or `/rank`.
 - Profiles and cards are query-string pages (`u/?user=`, `card/?user=&id=`), because a static host has no rewrites. `?embed` and `?theme=` are read by an inline script in `Base.astro` before first paint.
+- The contribution calendar comes from third-party sources in `src/lib/calendar.ts`, tried in order with three attempts each for transient failures (timeouts, 5xx, 429), then the next source. The profile renders first (`onPartial`) with `calendar: 'loading'`, and calendar cards take `calendarLoading` to show a scanning state instead of "offline". Any new source must send CORS headers and be checked from a browser, not just curl.
 - The rate limit is 60 core requests an hour and 10 searches a minute per visitor. Keep a profile load at or under about 8 core requests and 5 searches, and keep the one-hour localStorage cache.
 - Site name, repo, Action slug and social links live in `src/site.ts`.
 - Keys in `src/cards/registry.ts` are public URL slugs and file names. Never rename one.

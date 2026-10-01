@@ -35,13 +35,14 @@ export default function CardApp() {
   if (state.status === 'error') return <ErrorView login={state.login} error={state.error} />;
 
   const { profile } = state;
+  const calendarLoading = state.calendar === 'loading';
   if (embed) {
     // Interactive cards keep their own pointer handling. The rest link through to the full profile.
     return card.interactive ? (
-      <CardFigure profile={profile} card={card.id} live bare />
+      <CardFigure profile={profile} card={card.id} live bare calendarLoading={calendarLoading} />
     ) : (
       <a className="embed-card" href={urls.profile(profile.login)} target="_blank" rel="noopener">
-        <CardFigure profile={profile} card={card.id} live={false} bare />
+        <CardFigure profile={profile} card={card.id} live={false} bare calendarLoading={calendarLoading} />
       </a>
     );
   }
@@ -51,7 +52,7 @@ export default function CardApp() {
       <nav className="crumbs caption">
         <a href={urls.profile(profile.login)}>@{profile.login}</a> / {card.title}
       </nav>
-      <CardFigure profile={profile} card={card.id} solo />
+      <CardFigure profile={profile} card={card.id} solo calendarLoading={calendarLoading} />
     </>
   );
 }

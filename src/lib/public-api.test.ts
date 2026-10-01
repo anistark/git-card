@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { normalize } from './profile';
-import { calendarWeeks, fetchSources, genuineCommits, PublicApiError, toRawUser, type PublicSources } from './public-api';
+import {
+  calendarWeeks,
+  fetchPublicProfile,
+  fetchSources,
+  genuineCommits,
+  PublicApiError,
+  toRawUser,
+  type PublicProfile,
+  type PublicSources,
+} from './public-api';
 
 const NOW = new Date('2026-10-01T12:00:00Z');
 
@@ -55,7 +64,8 @@ function sources(overrides: Partial<PublicSources> = {}): PublicSources {
       ],
     },
     calendar: {
-      total: { lastYear: 6 },
+      source: 'test',
+      total: 6,
       contributions: [
         { date: '2026-09-26', count: 1 }, // Saturday
         { date: '2026-09-27', count: 2 }, // Sunday starts a new week
@@ -173,29 +183,89 @@ describe('fetchSources', () => {
       if (url.endsWith('/orgs')) return json([]);
       return json({}, 404);
     };
-    const { sources: s, warnings } = await fetchSources('octo', { fetch: fake as typeof fetch, now: NOW });
+    const { sources: s, warnings } = await fetchSources('octo', { fetch: fake as typeof fetch, now: NOW, calendarRetryDelayMs: 0 });
     expect(s.calendar).toBeNull();
     expect(s.commits).toBeNull();
     expect(s.pullRequests).toEqual({ total_count: 0, items: [] });
-    expect(warnings).toEqual(['Contribution calendar: unavailable.', 'Commits: search rate limit, try again in a minute.']);
+    expect(warnings.toSorted()).toEqual(['Commits: search rate limit, try again in a minute.', 'Contribution calendar: unavailable.']);
   });
 });
 
-describe('timeouts', () => {
-  it('gives up on a stalled calendar and keeps the rest of the profile', async () => {
-    const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+describe('calendar fallbacks and progressive loading', () => {
+  const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+  const stall = (init?: RequestInit) =>
+    new Promise<Response>((_, reject) => init?.signal?.addEventListener('abort', () => reject(init.signal!.reason)));
+  const github = (url: string) => {
+    if (url.endsWith('/users/octo')) return json(sources().user);
+    if (url.endsWith('/orgs')) return json([]);
+    return json({ total_count: 0, items: [] });
+  };
+  const week = [{ date: '2026-09-29', count: 5, intensity: '2' }];
+
+  it('switches to a backup source when the first one stalls', async () => {
     const fake = (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
-      if (url.includes('contributions-api')) {
-        // Never answers on its own: only the abort signal ends it.
-        return new Promise<Response>((_, reject) => init?.signal?.addEventListener('abort', () => reject(init.signal!.reason)));
-      }
-      if (url.endsWith('/users/octo')) return Promise.resolve(json(sources().user));
-      if (url.endsWith('/orgs')) return Promise.resolve(json([]));
-      return Promise.resolve(json({ total_count: 0, items: [] }));
+      if (url.includes('contributions-api')) return stall(init);
+      if (url.includes('gh-calendar')) return Promise.resolve(json({ total: 5, contributions: [week] }));
+      return Promise.resolve(github(url));
     };
-    const { sources: s, warnings } = await fetchSources('octo', { fetch: fake as typeof fetch, now: NOW, timeoutMs: 50 });
-    expect(s.calendar).toBeNull();
-    expect(warnings).toContain('Contribution calendar: unavailable.');
+    const { sources: s, warnings } = await fetchSources('octo', {
+      fetch: fake as typeof fetch,
+      now: NOW,
+      timeoutMs: 20,
+      calendarRetryDelayMs: 0,
+    });
+    expect(s.calendar).toEqual({ total: 5, contributions: [{ date: '2026-09-29', count: 5 }], source: 'gh-calendar.rschristian.dev' });
+    expect(warnings).toEqual([]);
+  });
+
+  it('gives up on the calendar once every source fails, and keeps the rest of the profile', async () => {
+    const fake = (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      return url.includes('api.github.com') ? Promise.resolve(github(url)) : stall(init);
+    };
+    const result = await fetchPublicProfile('octo', { fetch: fake as typeof fetch, now: NOW, timeoutMs: 10, calendarRetryDelayMs: 0 });
+    expect(result.calendar).toBe('offline');
+    expect(result.profile.login).toBe('octo');
+    expect(result.warnings).toContain('Contribution calendar: unavailable.');
+  });
+
+  it('hands over the profile first when the calendar is the last part loading', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const fake = async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('contributions-api')) {
+        await gate;
+        return json({ total: { lastYear: 5 }, contributions: week });
+      }
+      return github(url);
+    };
+    const partials: PublicProfile[] = [];
+    const done = fetchPublicProfile('octo', {
+      fetch: fake as typeof fetch,
+      now: NOW,
+      onPartial: (p) => {
+        partials.push(p);
+        release();
+      },
+    });
+    const result = await done;
+    expect(partials).toHaveLength(1);
+    expect(partials[0]).toMatchObject({ calendar: 'loading', warnings: [] });
+    expect(partials[0].profile.weeks).toEqual([]);
+    expect(result).toMatchObject({ calendar: 'ready', calendarSource: 'github-contributions-api.jogruber.de' });
+    expect(result.profile.totals.contributions).toBe(5);
+  });
+
+  it('skips the partial step when the calendar is already in', async () => {
+    const fake = async (input: RequestInfo | URL) => {
+      const url = String(input);
+      return url.includes('contributions-api') ? json({ total: { lastYear: 5 }, contributions: week }) : github(url);
+    };
+    const partials: PublicProfile[] = [];
+    const result = await fetchPublicProfile('octo', { fetch: fake as typeof fetch, now: NOW, onPartial: (p) => partials.push(p) });
+    expect(partials).toEqual([]);
+    expect(result.calendar).toBe('ready');
   });
 });

@@ -17,9 +17,9 @@ export function HeatmapCard(props: CardProps) {
         tag="CAL"
         size="wide"
         eyebrow="Contributions · last 12 months"
-        label="Contribution calendar unavailable"
+        label={props.calendarLoading ? 'Contribution calendar loading' : 'Contribution calendar unavailable'}
       >
-        <CalendarOffline width={760} height={400} />
+        <CalendarOffline width={760} height={400} loading={props.calendarLoading} />
       </Shell>
     );
   }

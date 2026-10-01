@@ -441,6 +441,11 @@ section + section {
   line-height: 1;
   color: var(--text);
 }
+/* Waiting on the calendar: the readout blinks like a terminal still working. */
+.rank-badge.scanning .rank-tier,
+.rank-badge.scanning .rank-top {
+  animation: blink 1.1s steps(2, end) infinite;
+}
 .rank-badge.elite {
   box-shadow: inset 0 0 0 1px var(--hot);
 }
@@ -1153,6 +1158,13 @@ section + section {
 .warnings ul {
   margin: var(--sp-1) 0 0;
   padding-left: 1.2em;
+}
+/* Calendar retries and fallbacks: data-colored, since nothing has failed yet. */
+.calendar-status {
+  box-shadow: inset 3px 0 0 var(--data);
+}
+.calendar-status .caption {
+  margin: var(--sp-1) 0 0;
 }
 
 .refresh {
