@@ -13,6 +13,7 @@ import {
   InstancedBufferAttribute,
   InstancedMesh,
   LineBasicMaterial,
+  Matrix4,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
@@ -20,9 +21,11 @@ import {
   Object3D,
   PerspectiveCamera,
   PlaneGeometry,
+  Quaternion,
   Raycaster,
   Scene,
   Vector2,
+  Vector3,
   WebGLRenderer,
 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -37,6 +40,8 @@ export type Cell = [number, number, number, number, number, string];
 interface Options {
   onHover: (cell: Cell | null) => void;
   onReady: () => void;
+  /** Floats over the hovered tower with its count, kept on top of it as the view moves. Positioned in host pixels. */
+  tag?: HTMLElement;
 }
 
 const GAP = 0.82;
@@ -72,7 +77,7 @@ function readPalette(): Palette {
   };
 }
 
-export function mountSkyline(host: HTMLElement, cells: Cell[], weeks: number, { onHover, onReady }: Options): () => void {
+export function mountSkyline(host: HTMLElement, cells: Cell[], weeks: number, { onHover, onReady, tag }: Options): () => void {
   // No calendar, no city. Three.js also cannot build per-tile colors for an empty set.
   if (!cells.length) return () => {};
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -157,6 +162,22 @@ export function mountSkyline(host: HTMLElement, cells: Cell[], weeks: number, { 
   gridMaterial.depthWrite = false;
   // Cell centers sit on whole or half units depending on the week count. Shift the grid to run between buildings.
   grid.position.set(weeks % 2 === 0 ? 0.5 : 0, -0.01, 0.5);
+  // The wire floor is faint under the city and dissolves within a few cells of it, instead of running to the fog.
+  gridMaterial.onBeforeCompile = (shader) => {
+    shader.uniforms.uOffset = { value: new Vector2(grid.position.x, grid.position.z) };
+    shader.uniforms.uHalf = { value: new Vector2(weeks / 2 + 0.5, 3.5) };
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nuniform vec2 uOffset;\nvarying vec2 vFloor;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFloor = position.xz + uOffset;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform vec2 uHalf;\nvarying vec2 vFloor;')
+      .replace(
+        '#include <color_fragment>',
+        `#include <color_fragment>
+        float outside = length( max( abs( vFloor ) - uHalf, 0.0 ) );
+        diffuseColor.a *= 1.0 - smoothstep( 0.0, 9.0, outside );`,
+      );
+  };
   city.add(grid);
 
   const beamMaterial = new MeshBasicMaterial({ transparent: true, opacity: 0.7, depthWrite: false });
@@ -185,7 +206,7 @@ export function mountSkyline(host: HTMLElement, cells: Cell[], weeks: number, { 
     uniforms.uGlow.value = night ? 0.22 : 0;
     uniforms.uBeamColor.value.copy(palette.signal).multiplyScalar(night ? 0.85 : 0.5);
     gridMaterial.color.copy(palette.signal);
-    gridMaterial.opacity = night ? 0.22 : 0.12;
+    gridMaterial.opacity = night ? 0.12 : 0.08;
     beamMaterial.color.copy(palette.signal);
     beamMaterial.blending = night ? AdditiveBlending : NormalBlending;
     render();
@@ -222,6 +243,28 @@ export function mountSkyline(host: HTMLElement, cells: Cell[], weeks: number, { 
   function render() {
     if (night) composer.render();
     else renderer.render(scene, camera);
+    placeTag();
+  }
+
+  // The hovered tower's top, projected to the screen every frame, since the city rises, sways and orbits.
+  const instance = new Matrix4();
+  const top = new Vector3();
+  const turn = new Quaternion();
+  const size = new Vector3();
+  function placeTag() {
+    if (!tag) return;
+    const cell = cells[hovered];
+    if (!cell || cell[2] === 0) {
+      tag.hidden = true;
+      return;
+    }
+    mesh.getMatrixAt(hovered, instance);
+    instance.decompose(top, turn, size);
+    top.y += size.y / 2;
+    top.applyMatrix4(mesh.matrixWorld).project(camera);
+    tag.textContent = cell[2].toLocaleString();
+    tag.style.transform = `translate(${((top.x + 1) / 2) * host.clientWidth}px, ${((1 - top.y) / 2) * host.clientHeight}px) translate(-50%, -100%)`;
+    tag.hidden = false;
   }
 
   const resize = () => {
@@ -247,10 +290,12 @@ export function mountSkyline(host: HTMLElement, cells: Cell[], weeks: number, { 
     if (hit === hovered) return;
     hovered = hit;
     onHover(hit >= 0 ? cells[hit] : null);
+    placeTag();
   };
   const onPointerLeave = () => {
     hovered = -1;
     onHover(null);
+    placeTag();
   };
   renderer.domElement.addEventListener('pointermove', onPointerMove);
   renderer.domElement.addEventListener('pointerleave', onPointerLeave);

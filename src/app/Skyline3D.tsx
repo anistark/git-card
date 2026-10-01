@@ -18,6 +18,7 @@ const supportsWebGL = () => {
 export function Skyline3D({ profile }: { profile: Profile }) {
   const host = useRef<HTMLDivElement>(null);
   const readout = useRef<HTMLDivElement>(null);
+  const tag = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -37,6 +38,7 @@ export function Skyline3D({ profile }: { profile: Profile }) {
               readout.current.textContent = cell ? `${cell[2]} on ${shortDate(cell[5])} ${cell[5].slice(0, 4)}` : 'Drag to orbit';
           },
           onReady: () => setReady(true),
+          tag: tag.current ?? undefined,
         });
       },
       { rootMargin: '200px' },
@@ -63,6 +65,8 @@ export function Skyline3D({ profile }: { profile: Profile }) {
       <div ref={readout} className="sky3d-hover caption tabular" aria-live="polite">
         Drag to orbit
       </div>
+      {/* The hovered tower's count, floating over it. The scene moves it, the readout above speaks it. */}
+      <div ref={tag} className="sky3d-tag tabular" aria-hidden="true" hidden />
     </div>
   );
 }
