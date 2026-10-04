@@ -1130,6 +1130,162 @@ section + section {
   color: var(--muted);
 }
 
+/* ---- Project stats page ----------------------------------- */
+.stats-page,
+.stats-section {
+  display: grid;
+  gap: var(--sp-3);
+}
+.stats-section {
+  margin-top: var(--sp-4);
+}
+/* Grid items default to their content's width, which would let a wide table push the page sideways. */
+.stats-page > *,
+.stats-section > * {
+  min-width: 0;
+}
+.stats-page .lead,
+.stats-status {
+  margin: 0;
+}
+
+.stat-tiles {
+  list-style: none;
+  margin: var(--sp-3) 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--sp-2);
+}
+.stat-tile {
+  --cut: 12px;
+  padding: var(--sp-3);
+  display: grid;
+  align-content: start;
+  gap: var(--sp-1);
+}
+.stat-label {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: var(--t-caption);
+  color: var(--accent);
+}
+.stat-value {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 2.6rem;
+  line-height: 1;
+  color: var(--data);
+}
+
+/* The 3D city. Its box shows from the start with its label, and the canvas fades in once drawn. */
+.stats3d {
+  --cut: 18px;
+  position: relative;
+  aspect-ratio: 16 / 7;
+  margin-top: var(--sp-3);
+  cursor: grab;
+  overflow: hidden;
+}
+.stats3d:active {
+  cursor: grabbing;
+}
+.stats3d canvas {
+  position: absolute;
+  inset: 1px;
+  width: calc(100% - 2px);
+  height: calc(100% - 2px);
+  clip-path: inherit;
+  opacity: 0;
+  transition: opacity 600ms ease-out;
+  touch-action: pan-y;
+}
+.stats3d.is-ready canvas {
+  opacity: 1;
+}
+.stats3d::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(to bottom, transparent 0 2px, var(--scan) 2px 3px);
+}
+.stats3d-pins {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 600ms ease-out 400ms;
+}
+.stats3d.is-ready .stats3d-pins {
+  opacity: 1;
+}
+/* Pinned to a point in the scene by a JS transform. `translate` lines them up against that point. */
+.stats3d-lane,
+.stats3d-date {
+  position: absolute;
+  top: 0;
+  left: 0;
+  white-space: nowrap;
+  will-change: transform;
+}
+.stats3d-lane {
+  translate: -100% -50%;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--t-eyebrow);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+.stats3d-date {
+  translate: -50% 0;
+}
+.stats-no3d {
+  margin: var(--sp-3) 0 0;
+}
+
+.adopters {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--sp-1) var(--sp-3);
+}
+.adopters li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding: var(--sp-1) 0;
+  border-top: 1px dashed var(--line);
+}
+.stats-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-3);
+}
+.metric-table caption {
+  caption-side: top;
+  text-align: left;
+  padding-bottom: var(--sp-2);
+}
+.stats-page .fine-print {
+  margin-top: var(--sp-4);
+}
+
+@media (max-width: 760px) {
+  .stats3d {
+    aspect-ratio: 4 / 3;
+  }
+  .stats-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* ---- Client app states ------------------------------------ */
 .card-art > svg {
   display: block;

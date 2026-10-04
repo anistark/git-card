@@ -3,6 +3,7 @@
 // rewrites: u/index.html exists, u/x/index.html does not.
 
 import type { Theme } from '../cards/style';
+import { SITE } from '../site';
 
 const BASE = (import.meta.env?.BASE_URL ?? '/').replace(/\/?$/, '/');
 
@@ -32,6 +33,10 @@ const utm = (tags?: Utm) => tags && { utm_source: tags.source, utm_medium: tags.
 export const urls = {
   home: () => href(''),
   rank: () => href('rank/'),
+  stats: () => href('stats/'),
+  /** The Stats workflow's history file on the `stats` branch. In dev, the copy `just stats` writes. */
+  statsHistory: () =>
+    import.meta.env?.DEV ? href('stats.local.json') : `${SITE.repo.replace('github.com', 'raw.githubusercontent.com')}/stats/history.json`,
   profile: (login: string, tags?: Utm) => href(`u/${query({ user: login, ...utm(tags) })}`),
   card: (login: string, card: string, opts: CardLinkOptions = {}) =>
     href(`card/${query({ user: login, id: card, embed: opts.embed, theme: opts.theme })}`),

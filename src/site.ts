@@ -12,6 +12,7 @@ export const SITE = {
   author: { name: 'Ani', url: 'https://github.com/anistark' },
   /** The GitHub Action people use to keep README cards fresh. `just release` moves the major tag. */
   action: 'anistark/git-card@v0',
+  marketplace: 'https://github.com/marketplace/actions/git-card',
   /** Google Analytics. The tag only runs on this host, so local builds and forks never report here. */
   analytics: { id: 'G-WTCT8ZW8H8', host: 'anistark.github.io' },
 } as const;

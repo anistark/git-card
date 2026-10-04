@@ -48,9 +48,9 @@ check:
 cards users out="og-out/cards":
     GITHUB_TOKEN="${GITHUB_TOKEN:-$(gh auth token)}" pnpm exec tsx scripts/generate.tsx --users {{ quote(users) }} --out {{ quote(out) }}
 
-# Count public repos whose workflows use the git-card Action (uses $GITHUB_TOKEN, or your gh login)
-adoption:
-    GITHUB_TOKEN="${GITHUB_TOKEN:-$(gh auth token)}" pnpm exec tsx scripts/adoption.ts
+# Collect project stats into public/stats.local.json, which /stats reads in dev (uses $GITHUB_TOKEN, or your gh login)
+stats:
+    GITHUB_TOKEN="${GITHUB_TOKEN:-$(gh auth token)}" pnpm exec tsx scripts/stats.ts --history public/stats.local.json
 
 # Rebuild every logo asset (site, favicons, embedded card logo) from assets/brand/git-card-logo.png
 brand:

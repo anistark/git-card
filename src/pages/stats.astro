@@ -1,0 +1,21 @@
+---
+import StatsApp from '../app/StatsApp';
+import Base from '../layouts/Base.astro';
+---
+
+<Base
+  title="Stats · git-card"
+  description="git-card in numbers: repos running the Action, stars, forks and repo traffic, recorded daily and drawn as a 3D city."
+>
+  <section class="stats-page">
+    <p class="eyebrow">Project telemetry</p>
+    <h1 class="display glitch rgb" data-text="git-card in numbers.">
+      git-card in <span class="neon">numbers.</span>
+    </h1>
+    <p class="lead">Who runs the Action, who stars the repo and how many people stop by. Recorded every day and drawn as a city.</p>
+    <StatsApp client:only="react" />
+    <noscript>
+      <p class="lead">The stats load in your browser, so this page needs JavaScript.</p>
+    </noscript>
+  </section>
+</Base>

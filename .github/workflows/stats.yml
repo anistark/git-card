@@ -1,0 +1,54 @@
+name: Stats
+
+# Daily snapshot of stars, forks, repos using the Action and repo traffic, kept in history.json on the
+# `stats` branch, which /stats reads. Traffic needs the STATS_TOKEN secret (see scripts/stats.ts).
+on:
+  schedule:
+    - cron: '41 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: stats
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Load history
+        run: |
+          git worktree add --detach stats-data
+          cd stats-data
+          if git fetch -q --depth 1 origin stats; then
+            git checkout -q -B stats FETCH_HEAD
+          else
+            git checkout -q --orphan stats && git rm -rfq .
+          fi
+
+      - name: Collect
+        run: pnpm exec tsx scripts/stats.ts --history stats-data/history.json
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          STATS_TOKEN: ${{ secrets.STATS_TOKEN }}
+
+      - name: Save history
+        working-directory: stats-data
+        run: |
+          git add history.json
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -qm "Stats for $(date -u +%F)"
+          git push -q origin stats

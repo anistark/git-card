@@ -33,6 +33,9 @@ pnpm-debug.log*
 .pi
 .vscode
 
+# project stats from `just stats`, for /stats in dev
+public/stats.local.json
+
 # rendered OG previews from `just og`
 og-out/
 
