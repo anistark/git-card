@@ -41,7 +41,7 @@ READMEs only show images, and GitHub fetches them through its own image proxy, s
        runs-on: ubuntu-latest
        steps:
          - uses: actions/checkout@v5
-         - uses: anistark/git-card@main
+         - uses: anistark/git-card@v0
            with:
              cards: skyline,rank # or "all"
          - run: |

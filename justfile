@@ -73,6 +73,32 @@ ci:
     pnpm vitest run
     pnpm build
 
+# Tag a release, move the major tag (v0) to it and push both. Then publish it on GitHub.
+release version:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    version='{{ version }}'
+    version="${version#v}"
+    [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Usage: just release 0.2.0"; exit 1; }
+    tag="v$version"
+    major="v${version%%.*}"
+    [[ "$(git rev-parse --abbrev-ref HEAD)" == main ]] || { echo "Release from main."; exit 1; }
+    [[ -z "$(git status --porcelain)" ]] || { echo "Commit or stash your changes first."; exit 1; }
+    git fetch -q origin main --tags
+    git merge-base --is-ancestor origin/main HEAD || { echo "main is behind origin. Pull first."; exit 1; }
+    if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then echo "$tag already exists."; exit 1; fi
+    grep -q "@$major'" src/site.ts || { echo "SITE.action in src/site.ts does not use @$major. Update it and the README first."; exit 1; }
+    just ci
+    if [[ "$(node -p 'require("./package.json").version')" != "$version" ]]; then
+      npm pkg set version="$version"
+      git commit -qam "chore: release $tag"
+    fi
+    git tag -a "$tag" -m "$tag"
+    git tag -f "$major"
+    git push origin main "$tag"
+    git push -f origin "$major"
+    echo "Pushed $tag and moved $major. Publish it: https://github.com/anistark/git-card/releases/new?tag=$tag"
+
 # Remove build output and caches
 clean:
     rm -rf dist .astro node_modules/.vite og-out

@@ -28,6 +28,16 @@ just ci
 
 The card then gets its own page, iframe embed, download and Action output without any more work.
 
+## Releasing
+
+```sh
+just release 0.2.0
+```
+
+From a clean `main`, this runs `just ci`, sets the version in `package.json`, tags `v0.2.0`, moves the `v0` tag to it and pushes. Then open the link it prints to publish the release on the Marketplace.
+
+Snippets and the README point at `v0`, so every release reaches existing users the next time their workflow runs. For a breaking change, bump the major version and change `SITE.action` in `src/site.ts` and the README to the new tag before releasing.
+
 ## House rules
 
 - No em dashes or semicolons in user-facing copy.
