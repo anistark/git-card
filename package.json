@@ -1,7 +1,7 @@
 {
   "name": "git-card",
   "type": "module",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Type a GitHub username, get a 3D contribution skyline and embeddable stat cards.",
   "license": "MIT",
   "author": "Ani (https://github.com/anistark)",

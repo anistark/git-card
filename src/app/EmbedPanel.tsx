@@ -3,6 +3,7 @@ import { getCard, type CardId } from '../cards/registry';
 import { SIZES } from '../cards/shell';
 import { LIGHT_THEME, standaloneCss, THEME_CHOICES, type Theme } from '../cards/style';
 import { SITE } from '../site';
+import { track } from '../lib/analytics';
 import { absolute, urls } from '../lib/urls';
 
 // ---- Hosted snapshots ------------------------------------------------------------------------
@@ -55,9 +56,10 @@ function download(name: string, text: string) {
 
 // ---- UI ----------------------------------------------------------------------------------------
 
-function CopyField({ id, label, value, hint }: { id: string; label: string; value: string; hint: string }) {
+function CopyField({ id, label, value, hint, onCopy }: { id: string; label: string; value: string; hint: string; onCopy: () => void }) {
   const [copied, setCopied] = useState<'idle' | 'copied' | 'manual'>('idle');
   const copy = async () => {
+    onCopy();
     try {
       await navigator.clipboard.writeText(value);
       setCopied('copied');
@@ -107,7 +109,9 @@ export function EmbedPanel({
   const suffix = theme === 'auto' ? '' : `-${theme}`;
   const file = `${card}${suffix}.svg`;
   const alt = `${def.title} for @${login}`;
-  const profileUrl = absolute(urls.profile(login));
+  // The README link carries UTM tags, since GA cannot see the card itself inside a rendered README.
+  const readmeLink = absolute(urls.profile(login, { source: 'readme', medium: 'card', campaign: card }));
+  const copied = (snippet: string) => () => track('copy_snippet', { snippet, card, hosted });
 
   const action = `# .github/workflows/git-card.yml in your profile repo
 name: git-card
@@ -152,23 +156,27 @@ jobs:
           <CopyField
             id={`${uid}-md`}
             label="README"
-            value={`[![${alt}](${absolute(urls.snapshotSvg(login, card, theme))})](${profileUrl})`}
+            value={`[![${alt}](${absolute(urls.snapshotSvg(login, card, theme))})](${readmeLink})`}
             hint="A hosted image, refreshed daily. Paste it into any README."
+            onCopy={copied('readme')}
           />
         ) : (
           <>
             <CopyField
               id={`${uid}-md`}
               label="README"
-              value={`[![${alt}](./git-card/${file})](${profileUrl})`}
+              value={`[![${alt}](./git-card/${file})](${readmeLink})`}
               hint="READMEs need an image file. Download it into a git-card folder in your repo, or let the Action below keep it fresh."
+              onCopy={copied('readme')}
             />
             <div className="embed-actions">
               <button
                 type="button"
                 onClick={() => {
                   const svg = getSvg();
-                  if (svg) download(file, standaloneSvg(svg, theme));
+                  if (!svg) return;
+                  download(file, standaloneSvg(svg, theme));
+                  track('download_svg', { card });
                 }}
               >
                 Download {file}
@@ -179,6 +187,7 @@ jobs:
               label="Auto-update with GitHub Actions"
               value={action}
               hint="Re-renders the card every day with fresh data and commits it to your repo."
+              onCopy={copied('action')}
             />
           </>
         )}
@@ -188,6 +197,7 @@ jobs:
           label="Link"
           value={absolute(urls.card(login, card, { theme }))}
           hint="Share this card on its own page."
+          onCopy={copied('link')}
         />
         <CopyField
           id={`${uid}-iframe`}
@@ -198,6 +208,7 @@ jobs:
               ? 'Live and interactive, with the 3D view. For blogs and portfolios.'
               : 'Live and animated. For blogs and portfolios.'
           }
+          onCopy={copied('iframe')}
         />
       </div>
     </details>

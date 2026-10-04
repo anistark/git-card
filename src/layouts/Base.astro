@@ -8,6 +8,7 @@ import { CARD_CSS, LIGHT_THEME, THEME_CSS } from '../cards/style';
 import Footer from '../components/Footer.astro';
 import Logo from '../components/Logo.astro';
 import { href } from '../lib/urls';
+import { SITE } from '../site';
 
 interface Props {
   title: string;
@@ -69,6 +70,28 @@ const imageUrl = new URL(href(image), Astro.site).href;
           // Storage can be blocked. The page then just follows the system theme.
         }
       })();
+    </script>
+    <script is:inline define:vars={{ ga: SITE.analytics }}>
+      // Google Analytics, on the live site only and never inside an embed on someone else's page.
+      // Visitors in the EEA, UK and Switzerland get cookieless pings. Ad signals are off everywhere.
+      if (location.hostname === ga.host && !document.documentElement.classList.contains('embed')) {
+        window.dataLayer = window.dataLayer || [];
+        const gtag = (window.gtag = function () {
+          // gtag.js only reads the Arguments object. A rest array is silently ignored.
+          // eslint-disable-next-line prefer-rest-params
+          window.dataLayer.push(arguments);
+        });
+        const noAds = { ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' };
+        const strict = 'AT BE BG HR CY CZ DK EE FI FR DE GR HU IE IT LV LT LU MT NL PL PT RO SK SI ES SE IS LI NO GB CH';
+        gtag('consent', 'default', { ...noAds, analytics_storage: 'denied', region: strict.split(' ') });
+        gtag('consent', 'default', { ...noAds, analytics_storage: 'granted' });
+        gtag('js', new Date());
+        gtag('config', ga.id);
+        const tag = document.createElement('script');
+        tag.async = true;
+        tag.src = 'https://www.googletagmanager.com/gtag/js?id=' + ga.id;
+        document.head.appendChild(tag);
+      }
     </script>
     <style is:inline set:html={THEME_CSS + CARD_CSS}></style>
   </head>

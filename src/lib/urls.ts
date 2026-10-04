@@ -8,6 +8,13 @@ const BASE = (import.meta.env?.BASE_URL ?? '/').replace(/\/?$/, '/');
 
 export const href = (path = '') => BASE + path.replace(/^\//, '');
 
+/** UTM tags, so Google Analytics can tell which pasted snippet a visit came from. */
+export interface Utm {
+  source: string;
+  medium: string;
+  campaign?: string;
+}
+
 export interface CardLinkOptions {
   embed?: boolean;
   theme?: Theme;
@@ -20,10 +27,12 @@ const query = (params: Record<string, string | boolean | undefined>) => {
   return parts.length ? `?${parts.join('&')}` : '';
 };
 
+const utm = (tags?: Utm) => tags && { utm_source: tags.source, utm_medium: tags.medium, utm_campaign: tags.campaign };
+
 export const urls = {
   home: () => href(''),
   rank: () => href('rank/'),
-  profile: (login: string) => href(`u/${query({ user: login })}`),
+  profile: (login: string, tags?: Utm) => href(`u/${query({ user: login, ...utm(tags) })}`),
   card: (login: string, card: string, opts: CardLinkOptions = {}) =>
     href(`card/${query({ user: login, id: card, embed: opts.embed, theme: opts.theme })}`),
   /** Pre-rendered SVGs published with the site for the logins in SNAPSHOT_USERS. */

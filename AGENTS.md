@@ -30,6 +30,7 @@ Consult these guides before working on related tasks:
 - The contribution calendar comes from third-party sources in `src/lib/calendar.ts`, tried in order with three attempts each for transient failures (timeouts, 5xx, 429), then the next source. The profile renders first (`onPartial`) with `calendar: 'loading'`, and calendar cards take `calendarLoading` to show a scanning state instead of "offline". Any new source must send CORS headers and be checked from a browser, not just curl.
 - The rate limit is 60 core requests an hour and 10 searches a minute per visitor. Keep a profile load at or under about 8 core requests and 5 searches, and keep the one-hour localStorage cache.
 - Site name, repo, Action slug and social links live in `src/site.ts`.
+- Google Analytics (`SITE.analytics`) loads from an inline script in `Base.astro`, only when `location.hostname` matches its host and never under `?embed`. EEA, UK and Swiss visitors get cookieless pings, and ad signals are denied everywhere. Send custom events through `track()` in `src/lib/analytics.ts`, never `gtag` directly.
 - Keys in `src/cards/registry.ts` are public URL slugs and file names. Never rename one.
 - Cards are pure React SVG components with no hooks or effects, because they also render to standalone `.svg` files in Node.
 - Copy rules: no em dashes or semicolons in user-facing text.
