@@ -4,6 +4,8 @@
 
 # git-card
 
+[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-git--card-FCEE0A?style=flat-square&logo=githubactions&logoColor=white&labelColor=0A0A0C)](https://github.com/marketplace/actions/git-card)
+
 Type a GitHub username and get a 3D contribution skyline, an F to SSS rank, streaks, languages, top repos and an organization breakdown. Every card has its own link, and every card can go into a README.
 
 It is a static site. Profiles are built in the visitor's browser from public APIs, so there is no server and no token to run it.
