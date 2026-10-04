@@ -1,6 +1,10 @@
 ---
 // Brand marks from Simple Icons (CC0), read at build time so only these ship.
+import astro from 'simple-icons/icons/astro.svg?raw';
+import githubpages from 'simple-icons/icons/githubpages.svg?raw';
 import mastodon from 'simple-icons/icons/mastodon.svg?raw';
+import svg from 'simple-icons/icons/svg.svg?raw';
+import threejs from 'simple-icons/icons/threedotjs.svg?raw';
 import x from 'simple-icons/icons/x.svg?raw';
 import type { IconName } from '../site';
 
@@ -12,7 +16,9 @@ interface Props {
 const { name, size = 18 } = Astro.props;
 
 const pathOf = (svg: string) => svg.match(/<path d="([^"]+)"/)?.[1] ?? '';
-const paths: Record<IconName, string> = { x: pathOf(x), mastodon: pathOf(mastodon) };
+const paths: Record<IconName, string> = Object.fromEntries(
+  Object.entries({ x, mastodon, astro, threejs, githubpages, svg }).map(([name, file]) => [name, pathOf(file)]),
+) as Record<IconName, string>;
 ---
 
 <svg class="icon" width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false">

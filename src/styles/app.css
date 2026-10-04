@@ -105,7 +105,10 @@ body {
 .footer-grid {
   display: grid;
   grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr));
-  gap: var(--sp-4) var(--sp-3);
+  gap: var(--sp-2) var(--sp-3);
+}
+.footer-logo {
+  grid-column: 1 / -1;
 }
 .footer-brand {
   display: grid;
@@ -119,8 +122,38 @@ body {
 .footer-star {
   display: inline-flex;
   align-items: center;
-  gap: var(--sp-1);
+  gap: 0.6em;
   margin-top: var(--sp-1);
+}
+.star-swap {
+  display: inline-grid;
+  place-items: center;
+}
+.star-word,
+.star-icon {
+  grid-area: 1 / 1;
+}
+.star-icon {
+  opacity: 0;
+  filter: drop-shadow(0 0 6px var(--glow-c));
+}
+.footer-star:hover .star-word,
+.footer-star:focus-visible .star-word {
+  opacity: 0;
+}
+.footer-star:hover .star-icon,
+.footer-star:focus-visible .star-icon {
+  opacity: 1;
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .footer-star:hover .star-swap {
+    animation: card-glitch 420ms steps(1, end);
+  }
+}
+/* The heading's top lines up with the first line of the description beside it. */
+.footer-col .eyebrow {
+  margin: 0;
+  padding-top: 0.35em;
 }
 .footer-col ul {
   list-style: none;
@@ -133,6 +166,11 @@ body {
 .footer-col a {
   color: var(--text);
   text-decoration: none;
+}
+/* Built with is a row of icon buttons, styled like the social links. */
+.footer-col .built-with {
+  display: flex;
+  margin-top: var(--sp-2);
 }
 .footer-col a:hover {
   color: var(--accent);
@@ -1011,6 +1049,13 @@ section + section {
   }
   .footer-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: var(--sp-4);
+  }
+  .footer-logo {
+    margin-bottom: calc(var(--sp-2) - var(--sp-4));
+  }
+  .footer-built {
+    grid-column: 1 / -1;
   }
   .footer-brand {
     grid-column: 1 / -1;

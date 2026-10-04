@@ -5,43 +5,44 @@ import Icon from './Icon.astro';
 import Logo from './Logo.astro';
 
 const year = new Date().getFullYear();
-const examples = ['torvalds', 'gaearon', 'sindresorhus'];
 
 const columns = [
   {
     title: 'Project',
     links: [
-      { label: 'Source code', url: SITE.repo, external: true },
       { label: 'Report an issue', url: SITE.issues, external: true },
       { label: 'Contributing', url: SITE.contributing, external: true },
-      { label: `${SITE.license.name} License`, url: SITE.license.url, external: true },
     ],
   },
   {
     title: 'Explore',
     links: [
-      ...examples.map((login) => ({ label: `@${login}`, url: urls.profile(login), external: false })),
       { label: 'How ranks work', url: urls.rank(), external: false },
       { label: 'How embedding works', url: href('#how'), external: false },
-      { label: 'Project stats', url: urls.stats(), external: false },
     ],
-  },
-  {
-    title: 'Built with',
-    links: BUILT_WITH.map((b) => ({ ...b, external: true })),
   },
 ];
 ---
 
 <footer class="site-footer">
   <div class="footer-grid">
-    <div class="footer-brand">
+    <!-- The logo gets its own row, so the link columns line up with the description under it. -->
+    <div class="footer-logo">
       <Logo height={64} />
+    </div>
+    <div class="footer-brand">
       <p class="caption">
         {SITE.tagline} Free and open source under the {SITE.license.name} License. Fork it, self-host it, send a PR.
       </p>
-      <a class="btn btn-ghost footer-star" href={SITE.repo} rel="noopener">
-        Star on GitHub
+      <!-- On hover, "Star" glitches into a star. Both share one grid cell so the button keeps its width. -->
+      <a class="btn btn-ghost footer-star" href={SITE.repo} rel="noopener" aria-label="Star on GitHub">
+        <span class="star-swap" aria-hidden="true">
+          <span class="star-word">Star</span>
+          <svg class="star-icon" width="16" height="16" viewBox="0 0 24 24" focusable="false">
+            <path fill="currentColor" d="M12 1.8l3 7 7.6.6-5.8 5 1.8 7.4L12 17.8l-6.6 4 1.8-7.4-5.8-5 7.6-.6z" />
+          </svg>
+        </span>
+        <span aria-hidden="true">on GitHub</span>
       </a>
     </div>
 
@@ -64,6 +65,19 @@ const columns = [
         </ul>
       </nav>
     ))}
+
+    <nav class="footer-col footer-built" aria-label="Built with">
+      <p class="eyebrow">Built with</p>
+      <ul class="socials built-with">
+        {BUILT_WITH.map((b) => (
+          <li>
+            <a href={b.url} rel="noopener" aria-label={b.label} title={b.label}>
+              <Icon name={b.icon} />
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
   </div>
 
   <div class="footer-bar">

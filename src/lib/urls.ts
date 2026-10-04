@@ -33,7 +33,6 @@ const utm = (tags?: Utm) => tags && { utm_source: tags.source, utm_medium: tags.
 export const urls = {
   home: () => href(''),
   rank: () => href('rank/'),
-  stats: () => href('stats/'),
   /** The Stats workflow's history file on the `stats` branch. In dev, the copy `just stats` writes. */
   statsHistory: () =>
     import.meta.env?.DEV ? href('stats.local.json') : `${SITE.repo.replace('github.com', 'raw.githubusercontent.com')}/stats/history.json`,

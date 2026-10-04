@@ -17,7 +17,7 @@ export const SITE = {
   analytics: { id: 'G-WTCT8ZW8H8', host: 'anistark.github.io' },
 } as const;
 
-export type IconName = 'x' | 'mastodon';
+export type IconName = 'x' | 'mastodon' | 'astro' | 'threejs' | 'githubpages' | 'svg';
 
 export const SOCIALS: { label: string; url: string; icon: IconName; rel?: string }[] = [
   { label: 'X', url: 'https://x.com/kranirudha', icon: 'x' },
@@ -25,9 +25,10 @@ export const SOCIALS: { label: string; url: string; icon: IconName; rel?: string
   { label: 'Mastodon', url: 'https://fosstodon.org/@ani', icon: 'mastodon', rel: 'me' },
 ];
 
-export const BUILT_WITH = [
-  { label: 'Astro', url: 'https://astro.build' },
-  { label: 'three.js', url: 'https://threejs.org' },
-  { label: 'GitHub Pages', url: 'https://pages.github.com' },
-  { label: 'resvg', url: 'https://github.com/linebender/resvg' },
+// resvg has no logo, so it gets the SVG format mark.
+export const BUILT_WITH: { label: string; url: string; icon: IconName }[] = [
+  { label: 'Astro', url: 'https://astro.build', icon: 'astro' },
+  { label: 'three.js', url: 'https://threejs.org', icon: 'threejs' },
+  { label: 'GitHub Pages', url: 'https://pages.github.com', icon: 'githubpages' },
+  { label: 'resvg', url: 'https://github.com/linebender/resvg', icon: 'svg' },
 ];
