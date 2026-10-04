@@ -24,10 +24,18 @@ const action = SITE.action.split('@')[0];
 /** Stars and forks past this many are only counted, not dated. */
 const MAX_PAGES = 30;
 
+/** Waits out rate limits (code search on a workflow token hits them often) up to three times. */
 async function get<T>(path: string, { auth = token, accept = 'application/vnd.github+json' } = {}): Promise<T> {
-  const res = await fetch(`https://api.github.com/${path}`, { headers: { Authorization: `Bearer ${auth}`, Accept: accept } });
-  if (!res.ok) throw Object.assign(new Error(`${path}: ${res.status} ${await res.text()}`), { status: res.status });
-  return res.json() as Promise<T>;
+  for (let attempt = 1; ; attempt++) {
+    const res = await fetch(`https://api.github.com/${path}`, { headers: { Authorization: `Bearer ${auth}`, Accept: accept } });
+    if (res.ok) return res.json() as Promise<T>;
+    const body = await res.text();
+    const limited = res.status === 429 || (res.status === 403 && /rate limit/i.test(body));
+    if (!limited || attempt === 3) throw Object.assign(new Error(`${path}: ${res.status} ${body}`), { status: res.status });
+    const seconds = Number(res.headers.get('retry-after')) || Number(/try again in ([\d.]+)s/.exec(body)?.[1]) || 60;
+    console.warn(`Rate limited on ${path.split('?')[0]}, waiting ${Math.ceil(seconds)}s`);
+    await new Promise((r) => setTimeout(r, Math.min(seconds, 120) * 1000 + 1000));
+  }
 }
 
 /** Dates from a paginated list, or null when there are more than MAX_PAGES pages. */
@@ -42,7 +50,7 @@ async function dates<T>(path: string, total: number, pick: (item: T) => string, 
   return out;
 }
 
-async function adopters(): Promise<string[]> {
+async function adopters(): Promise<string[] | null> {
   const q = `"${action}" path:.github/workflows`;
   const found = new Set<string>();
   // Code search returns at most 1000 results, 100 a page.
@@ -93,7 +101,11 @@ const snapshot: Snapshot = {
     'application/vnd.github.star+json',
   ),
   forkDates: await dates<{ created_at: string }>(`repos/${repo}/forks`, info.forks_count, (f) => f.created_at),
-  adopters: await adopters(),
+  // A search that still fails after retrying keeps yesterday's adopters rather than losing the whole run.
+  adopters: await adopters().catch((error: Error) => {
+    console.warn(`Code search failed, keeping the previous adopters. ${error.message}`);
+    return null;
+  }),
   traffic: await traffic(),
 };
 
@@ -106,7 +118,7 @@ if (path) {
 }
 
 const lines = [
-  `${snapshot.adopters.length} repos use ${action}`,
+  snapshot.adopters ? `${snapshot.adopters.length} repos use ${action}` : 'Adopters skipped (code search failed)',
   `${fmt(snapshot.stars)} stars, ${fmt(snapshot.forks)} forks`,
   history.traffic
     ? `Last 14 days: ${fmt(history.recent!.views)} views from ${fmt(history.recent!.visitors)} visitors, ${fmt(history.recent!.clones)} clones`
@@ -122,7 +134,7 @@ if (summary) {
   appendFileSync(
     summary,
     [
-      `### ${snapshot.adopters.length} repos use \`${action}\``,
+      `### ${history.adopters.length} repos use \`${action}\``,
       '',
       ...lines.slice(1).map((l) => `- ${l}`),
       '',

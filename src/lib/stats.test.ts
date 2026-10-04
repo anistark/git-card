@@ -49,6 +49,13 @@ describe('mergeSnapshot', () => {
     expect(next.days['2026-10-06'].adopters).toBe(2);
   });
 
+  it('keeps the previous adopters when code search failed', () => {
+    const first = mergeSnapshot(null, snap({ adopters: ['a/one'] }));
+    const next = mergeSnapshot(first, snap({ at: '2026-10-05T03:41:00Z', adopters: null }));
+    expect(next.adopters).toEqual([{ repo: 'a/one', since: '2026-10-04' }]);
+    expect(next.days['2026-10-05'].adopters).toBeUndefined();
+  });
+
   it('records traffic per day and overwrites a partial day on the next run', () => {
     const traffic = (count: number) => ({
       views: [

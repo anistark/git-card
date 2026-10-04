@@ -50,7 +50,8 @@ export interface Snapshot {
   /** When each current star or fork happened, so the totals can be drawn back to day one. Null if too many to list. */
   starDates: string[] | null;
   forkDates: string[] | null;
-  adopters: string[];
+  /** Null when code search failed, which keeps the previous list and records no count for the day. */
+  adopters: string[] | null;
   traffic: {
     views: TrafficDay[];
     clones: TrafficDay[];
@@ -91,7 +92,7 @@ export function mergeSnapshot(prev: StatsHistory | null, snap: Snapshot): StatsH
     if (dates) for (const [date, n] of cumulative(dates, snap.createdAt, today)) set(date, key, n);
     else set(today, key, total);
   }
-  set(today, 'adopters', snap.adopters.length);
+  if (snap.adopters) set(today, 'adopters', snap.adopters.length);
 
   // GitHub lists every day of its window, zeros included, even from before the repo existed.
   // Later runs overwrite today's partial count.
@@ -107,8 +108,10 @@ export function mergeSnapshot(prev: StatsHistory | null, snap: Snapshot): StatsH
     updatedAt: snap.at,
     days: Object.fromEntries(Object.entries(days).sort(([a], [b]) => a.localeCompare(b))),
     adopters: snap.adopters
-      .map((repo) => ({ repo, since: since.get(repo.toLowerCase()) ?? today }))
-      .sort((a, b) => b.since.localeCompare(a.since) || a.repo.localeCompare(b.repo)),
+      ? snap.adopters
+          .map((repo) => ({ repo, since: since.get(repo.toLowerCase()) ?? today }))
+          .sort((a, b) => b.since.localeCompare(a.since) || a.repo.localeCompare(b.repo))
+      : (prev?.adopters ?? []),
     recent: snap.traffic?.recent ?? null,
     referrers: snap.traffic?.referrers ?? [],
     paths: snap.traffic?.paths ?? [],
