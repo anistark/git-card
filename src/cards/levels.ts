@@ -1,4 +1,5 @@
 import type { Day, Profile } from '../lib/profile';
+import { towerStyles, type TowerStyle } from '../lib/towers';
 import type { Cell } from '../scenes/skyline';
 
 /**
@@ -37,11 +38,29 @@ export function heightOf(count: number, max: number): number {
   return max > 0 ? Math.sqrt(count / max) : 0;
 }
 
+/** The building each day gets, by date. An empty day is not in it, since it is sea. */
+export function profileTowers(profile: Profile): Map<string, TowerStyle> {
+  const max = profile.peakDay?.count ?? 0;
+  return towerStyles(
+    profile.weeks.flat().map((day) => ({ id: day.date, height: heightOf(day.count, max) })),
+    profile.peakDay?.date,
+  );
+}
+
 /** Compact cells for the 3D view, shipped as JSON in the page. Shape: see Cell in scenes/skyline.ts. */
 export function skylineCells(profile: Profile): Cell[] {
   const level = leveller(profile);
   const max = profile.peakDay?.count ?? 0;
+  const towers = profileTowers(profile);
   return profile.weeks.flatMap((week, w) =>
-    week.map((day): Cell => [w, day.weekday, day.count, level(day), Math.round(heightOf(day.count, max) * 1000) / 1000, day.date]),
+    week.map((day): Cell => [
+      w,
+      day.weekday,
+      day.count,
+      level(day),
+      Math.round(heightOf(day.count, max) * 1000) / 1000,
+      day.date,
+      towers.get(day.date) ?? 'block',
+    ]),
   );
 }

@@ -1,6 +1,6 @@
-// Night City in 3D: every resident's skyline as a district on its own island, all in one sea. One instanced mesh
-// for the towers, one for the islands, one invisible box per district for picking, a radar sweep from the old
-// town and the same neon bloom as the skyline. Far districts collapse to one tower per week.
+// Night City in 3D: every resident's skyline as a district on its own island, all in one sea. An instanced mesh per
+// building shape, one for the islands, one invisible box per district for picking, a radar sweep from the old town
+// and the same neon bloom as the skyline. Far districts lose their landmarks, then collapse to one tower per week.
 import {
   AdditiveBlending,
   AmbientLight,
@@ -26,7 +26,9 @@ import {
 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { DISTRICT, districtDays, plots, stature, type Resident } from '../lib/city';
+import { towerStyles, type TowerStyle } from '../lib/towers';
 import { bloomComposer, readPalette, SEA_WAVE } from './common';
+import { towerMeshes } from './towers';
 
 interface Options {
   onHover: (index: number | null) => void;
@@ -60,6 +62,7 @@ export function mountCity(host: HTMLElement, residents: Resident[], opts: Option
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const places = plots(residents.length);
   const fullDetail = opts.small ? 120 : 320;
+  const landmarkDetail = opts.small ? 40 : 160; // a district of landmarks costs about three of plain blocks
 
   // Towers: each day with work, or each week's busiest day for districts past the detail limit.
   interface Tower {
@@ -69,6 +72,7 @@ export function mountCity(host: HTMLElement, residents: Resident[], opts: Option
     d: number;
     h: number;
     level: number;
+    style: TowerStyle;
     district: number;
   }
   const towers: Tower[] = [];
@@ -77,6 +81,8 @@ export function mountCity(host: HTMLElement, residents: Resident[], opts: Option
     const lift = stature(r.total);
     const days = districtDays(r);
     if (i < fullDetail) {
+      const plot = (week: number, day: number) => `${week}-${day}`;
+      const styles = i < landmarkDetail ? towerStyles(days.map(([week, day, height]) => ({ id: plot(week, day), height }))) : null;
       for (const [week, day, h] of days) {
         towers.push({
           x: x + week - DISTRICT.w / 2 + 0.5,
@@ -85,6 +91,7 @@ export function mountCity(host: HTMLElement, residents: Resident[], opts: Option
           d: GAP,
           h: 0.15 + h * MAX_H * lift,
           level: levelOf(h),
+          style: styles?.get(plot(week, day)) ?? 'block',
           district: i,
         });
       }
@@ -100,6 +107,7 @@ export function mountCity(host: HTMLElement, residents: Resident[], opts: Option
         d: DISTRICT.d - 1.5,
         h: 0.15 + h * MAX_H * lift,
         level: levelOf(h),
+        style: 'block',
         district: i,
       });
     }
@@ -132,7 +140,7 @@ export function mountCity(host: HTMLElement, residents: Resident[], opts: Option
   };
   const box = new BoxGeometry(1, 1, 1);
   box.translate(0, 0.5, 0); // grow up from the ground
-  const towerMaterial = new MeshStandardMaterial({ roughness: 0.55, metalness: 0.25 });
+  const towerMaterial = new MeshStandardMaterial({ roughness: 0.55, metalness: 0.25, vertexColors: true });
   towerMaterial.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vCityXZ;').replace(
@@ -160,9 +168,11 @@ export function mountCity(host: HTMLElement, residents: Resident[], opts: Option
         totalEmissiveRadiance += uBeamColor * ( smoothstep( 0.45, 0.0, behind ) * 0.35 + step( behind, 0.025 ) * 0.25 );`,
       );
   };
-  const towerMesh = new InstancedMesh(box, towerMaterial, Math.max(1, towers.length));
-  towerMesh.count = towers.length;
-  city.add(towerMesh);
+  const buildings = towerMeshes(
+    towers.map((t) => t.style),
+    towerMaterial,
+  );
+  city.add(...buildings.meshes);
 
   // Islands: a low slab under each district. Landmarks get a yellow rim to tell them from citizens.
   const islandMaterial = new MeshStandardMaterial({ roughness: 0.8, metalness: 0.1 });
@@ -240,10 +250,9 @@ export function mountCity(host: HTMLElement, residents: Resident[], opts: Option
       dummy.position.set(t.x, ISLAND_H, t.z);
       dummy.scale.set(t.w, Math.max(0.02, t.h * progress(t)), t.d);
       dummy.updateMatrix();
-      towerMesh.setMatrixAt(i, dummy.matrix);
+      buildings.setMatrixAt(i, dummy.matrix);
     });
-    towerMesh.instanceMatrix.needsUpdate = true;
-    towerMesh.computeBoundingSphere();
+    buildings.placed();
   };
   const tallest = residents.map(() => 0);
   for (const t of towers) tallest[t.district] = Math.max(tallest[t.district], t.h);
@@ -281,9 +290,10 @@ export function mountCity(host: HTMLElement, residents: Resident[], opts: Option
     const palette = readPalette();
     night = palette.night;
     const peak = palette.peak.clone().multiplyScalar(night ? 1.4 : 1);
-    towers.forEach((t, i) => towerMesh.setColorAt(i, t.level === 5 ? peak : palette.levels[t.level]));
+    towers.forEach((t, i) => buildings.setColorAt(i, t.level === 5 ? peak : palette.levels[t.level]));
     residents.forEach((_, i) => islands.setColorAt(i, palette.raised));
-    for (const mesh of [towerMesh, islands]) if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    buildings.painted();
+    if (islands.instanceColor) islands.instanceColor.needsUpdate = true;
     rimColors = {
       citizen: palette.raised.clone().lerp(palette.data, 0.35).multiplyScalar(0.7),
       landmark: palette.signal.clone().multiplyScalar(0.7),
@@ -530,7 +540,8 @@ export function mountCity(host: HTMLElement, residents: Resident[], opts: Option
       sea.geometry.dispose();
       for (const m of [towerMaterial, islandMaterial, rims.material as MeshBasicMaterial, pickMaterial, seaMaterial, beamMaterial])
         m.dispose();
-      for (const m of [towerMesh, islands, rims, picks]) m.dispose();
+      buildings.dispose();
+      for (const m of [islands, rims, picks]) m.dispose();
       renderer.dispose();
       canvas.remove();
     },
