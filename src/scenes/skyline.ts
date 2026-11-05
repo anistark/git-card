@@ -29,12 +29,14 @@ import {
   WebGLRenderer,
 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import type { TowerStyle } from '../lib/towers';
 import type { WeatherState } from '../lib/weather';
 import { bloomComposer, readPalette, SEA_WAVE } from './common';
+import { towerMeshes } from './towers';
 import { addWeather } from './weather';
 
-/** [week, weekday, count, level 0-5, height 0-1, date] */
-export type Cell = [number, number, number, number, number, string];
+/** [week, weekday, count, level 0-5, height 0-1, date, building] */
+export type Cell = [number, number, number, number, number, string, TowerStyle];
 
 interface Options {
   onHover: (cell: Cell | null) => void;
@@ -96,10 +98,7 @@ export function mountSkyline(
     uGlint: { value: weather?.state === 'rain' || weather?.state === 'storm' ? 1 : 0 },
     uGlintColor: { value: new Color() },
   };
-  const geometry = new BoxGeometry(1, 1, 1);
-  // 1 for sea tiles (empty days), which the vertex shader moves as waves. Buildings stay put.
-  geometry.setAttribute('aSea', new InstancedBufferAttribute(new Float32Array(cells.map((c) => (c[3] === 0 ? 1 : 0))), 1));
-  const material = new MeshStandardMaterial({ roughness: 0.55, metalness: 0.25 });
+  const material = new MeshStandardMaterial({ roughness: 0.55, metalness: 0.25, vertexColors: true });
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = shader.vertexShader
@@ -140,8 +139,29 @@ export function mountSkyline(
         totalEmissiveRadiance += uGlintColor * vGlint;`,
       );
   };
-  const mesh = new InstancedMesh(geometry, material, cells.length);
-  city.add(mesh);
+  const towers = towerMeshes(
+    cells.map((c) => c[6]),
+    material,
+    {
+      floor: -0.5, // towers are placed by their centre, so they can grow from the ground up
+      // 1 for sea tiles (empty days), which the vertex shader moves as waves. Buildings stay put.
+      dress: (geometry, indices) =>
+        geometry.setAttribute(
+          'aSea',
+          new InstancedBufferAttribute(
+            Float32Array.from(indices, (i) => (cells[i][3] === 0 ? 1 : 0)),
+            1,
+          ),
+        ),
+    },
+  );
+  city.add(...towers.meshes);
+  // Every day's whole plot, never drawn. Hover and the overlays go by these, since a spire is too thin to find with a
+  // pointer, and they keep the day's full height whatever stands on it.
+  const pickGeometry = new BoxGeometry(1, 1, 1);
+  const plots = new InstancedMesh(pickGeometry, material, cells.length);
+  plots.visible = false;
+  city.add(plots);
 
   const grid = new GridHelper(90, 90);
   const gridMaterial = grid.material as LineBasicMaterial;
@@ -199,8 +219,8 @@ export function mountSkyline(
     // The peak day burns brighter than everything else so bloom catches it.
     const peak = palette.peak.clone().multiplyScalar(night ? 1.4 : 1); // brighter than the rest so bloom catches it, without a big halo
     // Empty days are sea, the peak day is a bright neon green tower, the rest use the cyan ramp.
-    cells.forEach((cell, i) => mesh.setColorAt(i, cell[3] === 5 ? peak : cell[3] === 0 ? palette.sea : palette.levels[cell[3]]));
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    cells.forEach((cell, i) => towers.setColorAt(i, cell[3] === 5 ? peak : cell[3] === 0 ? palette.sea : palette.levels[cell[3]]));
+    towers.painted();
     scene.background = palette.surface;
     fog.color.copy(palette.surface);
     uniforms.uGlintColor.value.copy(palette.rain).multiplyScalar(night ? 1.2 : 0.6);
@@ -223,10 +243,12 @@ export function mountSkyline(
       dummy.position.set(w - weeks / 2, h / 2, d - 3);
       dummy.scale.set(GAP, h, GAP);
       dummy.updateMatrix();
-      mesh.setMatrixAt(i, dummy.matrix);
+      towers.setMatrixAt(i, dummy.matrix);
+      plots.setMatrixAt(i, dummy.matrix);
     });
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.computeBoundingSphere();
+    towers.placed();
+    plots.instanceMatrix.needsUpdate = true;
+    plots.computeBoundingSphere();
   };
 
   const controls = new OrbitControls(camera, renderer.domElement);
@@ -272,10 +294,10 @@ export function mountSkyline(
   const turn = new Quaternion();
   const size = new Vector3();
   function roofAt(index: number) {
-    mesh.getMatrixAt(index, instance);
+    plots.getMatrixAt(index, instance);
     instance.decompose(top, turn, size);
     top.y += size.y / 2;
-    top.applyMatrix4(mesh.matrixWorld).project(camera);
+    top.applyMatrix4(plots.matrixWorld).project(camera);
     return `translate(${((top.x + 1) / 2) * host.clientWidth}px, ${((1 - top.y) / 2) * host.clientHeight}px) translate(-50%, -100%)`;
   }
   function placeTag() {
@@ -310,7 +332,7 @@ export function mountSkyline(
     const rect = renderer.domElement.getBoundingClientRect();
     pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
     ray.setFromCamera(pointer, camera);
-    const hit = ray.intersectObject(mesh)[0]?.instanceId ?? -1;
+    const hit = ray.intersectObject(plots)[0]?.instanceId ?? -1;
     if (hit === hovered) return;
     hovered = hit;
     onHover(hit >= 0 ? cells[hit] : null);
@@ -395,13 +417,14 @@ export function mountSkyline(
     renderer.domElement.removeEventListener('pointerleave', onPointerLeave);
     controls.dispose();
     composer.dispose();
-    geometry.dispose();
+    towers.dispose();
+    pickGeometry.dispose();
+    plots.dispose();
     material.dispose();
     gridMaterial.dispose();
     grid.geometry.dispose();
     beam.geometry.dispose();
     beamMaterial.dispose();
-    mesh.dispose();
     for (const { el } of signEls) el.remove();
     sky?.dispose();
     renderer.dispose();

@@ -37,6 +37,8 @@ Cards: `skyline`, `rank`, `citizen`, `overview`, `heatmap`, `streak`, `languages
 
 The `projects` card lists every public repository you worked in over the last 12 months, busiest first, with its description, languages and topics. It shows the top 10. Pick another number from the card on the site, or set `projects` in the Action, up to 50. The card grows taller to fit them.
 
+Your biggest days become landmarks. The skyline ranks your days and builds them in the order the real ones stand: Big Ben, the Eiffel Tower, Tokyo Tower, the KL Tower, the Empire State Building, the Petronas Towers and Taipei 101, with your peak day as the Burj Khalifa. Hover a tower to see which one it is.
+
 Some days in the calendar hide easter eggs. Each one hangs a small neon sign on its tower in the skyline, and the profile page lists the ones found.
 
 The `citizen` card is a Night City ID: a role read from how you work (Wirejack, Gatekeeper, Lone Wolf and more), a clearance from your rank and a bounty on your head.

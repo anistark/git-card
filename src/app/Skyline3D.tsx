@@ -6,6 +6,7 @@ import { findEggs, MAX_SIGNS, signEggs } from '../lib/eggs';
 import { shortDate } from '../lib/format';
 import { hasCalendar, type Profile } from '../lib/profile';
 import { skylineStl, stlFileName } from '../lib/stl';
+import { TOWER_NAMES } from '../lib/towers';
 import { weatherFor } from '../lib/weather';
 import { download } from './export';
 
@@ -41,9 +42,10 @@ export function Skyline3D({ profile, weather: showWeather = true }: { profile: P
               seen.add(egg.key);
               track('egg_hover', { egg: egg.key });
             }
+            const name = egg?.label ?? (cell && TOWER_NAMES[cell[6]]);
             if (readout.current)
               readout.current.textContent = cell
-                ? `${egg ? `${egg.label}: ` : ''}${cell[2]} on ${shortDate(cell[5])} ${cell[5].slice(0, 4)}`
+                ? `${name ? `${name}: ` : ''}${cell[2]} on ${shortDate(cell[5])} ${cell[5].slice(0, 4)}`
                 : 'Drag to orbit';
           },
           onReady: () => setReady(true),

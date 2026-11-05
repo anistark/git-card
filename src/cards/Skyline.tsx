@@ -1,7 +1,8 @@
 import { findEggs, MAX_SIGNS, signEggs, type Egg } from '../lib/eggs';
 import { hasCalendar, type Profile } from '../lib/profile';
+import { TOWER_NAMES, towerOutline, type Face } from '../lib/towers';
 import { weatherFor, type Weather } from '../lib/weather';
-import { heightOf, leveller, skylineFill } from './levels';
+import { heightOf, leveller, profileTowers, skylineFill } from './levels';
 import { CalendarOffline, PAD, SIZES, Shell, shortDate, type CardProps } from './shell';
 import { WeatherBack, WeatherClip, WeatherFront, WeatherGround, type Box, type CityView } from './Weather';
 
@@ -17,6 +18,8 @@ type Pt = [number, number];
 const centerOf = (quad: Pt[]): Pt => [quad.reduce((n, p) => n + p[0], 0) / 4, quad.reduce((n, p) => n + p[1], 0) / 4];
 const r = (n: number) => Math.round(n * 10) / 10;
 const pts = (list: Pt[]) => list.map(([x, y]) => `${r(x)},${r(y)}`).join(' ');
+/** The shade class for each way a building's face can look. */
+const SHADE: Record<Face['kind'], string> = { cap: '', right: 'r ', front: 'f ' };
 
 interface CityProps {
   profile: Profile;
@@ -36,6 +39,7 @@ export function SkylineCity({ profile, box, animate = true, weather, sky = box, 
   const level = leveller(profile);
   const max = profile.peakDay?.count ?? 0;
   const weeks = profile.weeks.length;
+  const towers = profileTowers(profile);
 
   const columns = profile.weeks.map((week, w) =>
     week.map((day) => {
@@ -47,13 +51,20 @@ export function SkylineCity({ profile, box, animate = true, weather, sky = box, 
       const e: Pt = [px + FILL * D.x, py + FILL * D.y];
       const h = day.count > 0 ? 2 + heightOf(day.count, max) * MAX_H : 0;
       const up = ([x, y]: Pt): Pt => [x, y - h];
-      return { day, level: level(day), h, top: [up(a), up(b), up(c), up(e)], right: [b, c, up(c), up(b)], front: [e, c, up(c), up(e)] };
+      const style = towers.get(day.date) ?? 'block';
+      // From the building's unit box onto this plot.
+      const [mx, my] = centerOf([a, b, c, e]);
+      const faces = towerOutline(style, ([x, y, z]) => [
+        mx + x * (b[0] - a[0]) + y * (e[0] - a[0]),
+        my + x * (b[1] - a[1]) + y * (e[1] - a[1]) - z * h,
+      ]);
+      return { day, level: level(day), h, style, faces, top: [up(a), up(b), up(c), up(e)] };
     }),
   );
 
   const signs = showSigns ? placeSigns(findEggs(profile), columns.flat()) : [];
   const all = [
-    ...columns.flat().flatMap((col) => [...col.top, ...col.right, ...col.front]),
+    ...columns.flat().flatMap((col) => col.faces.flatMap((face) => face.points)),
     ...signs.flatMap((s): Pt[] => [
       [s.x, s.y],
       [s.x + s.w, s.y],
@@ -137,12 +148,12 @@ export function SkylineCity({ profile, box, animate = true, weather, sky = box, 
           <g key={w} className={animate ? 'gc-a-rise' : undefined} style={animate ? { animationDelay: `${w * 12}ms` } : undefined}>
             {col
               .filter((c) => c.level > 0)
-              .map(({ day, level: l, h, top, right, front }) => (
+              .map(({ day, level: l, style, faces }) => (
                 <g key={day.date} className={l === 5 ? 'gc-glow' : undefined}>
-                  <title>{`${day.count} on ${shortDate(day.date)}`}</title>
-                  {h > 0 && <polygon className={`r ${skylineFill(l)}`} points={pts(right)} />}
-                  {h > 0 && <polygon className={`f ${skylineFill(l)}`} points={pts(front)} />}
-                  <polygon className={skylineFill(l)} points={pts(top)} />
+                  <title>{`${TOWER_NAMES[style] ? `${TOWER_NAMES[style]}: ` : ''}${day.count} on ${shortDate(day.date)}`}</title>
+                  {faces.map(({ kind, points }, i) => (
+                    <polygon key={i} className={`${SHADE[kind]}${skylineFill(l)}`} points={pts(points)} />
+                  ))}
                 </g>
               ))}
           </g>
