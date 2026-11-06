@@ -258,6 +258,12 @@ function lastYearCounts(cc: RawUser['contributionsCollection']): Counts {
   return { commits, pullRequests, reviews, issues, total: commits + pullRequests + reviews + issues };
 }
 
+/** The day still going: the newest one on the calendar, skipping any days it holds past the moment it was fetched. */
+export function currentDay({ weeks, fetchedAt }: Pick<Profile, 'weeks' | 'fetchedAt'>): Day | undefined {
+  const today = fetchedAt.slice(0, 10);
+  return weeks.flat().findLast((day) => day.date <= today);
+}
+
 /** False when the contribution calendar could not be loaded, so calendar-based numbers would read as zero. */
 export function hasCalendar(p: Profile): boolean {
   return p.weeks.some((w) => w.length > 0);

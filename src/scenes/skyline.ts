@@ -29,9 +29,11 @@ import {
   WebGLRenderer,
 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { FILL as GAP, type Complex } from '../lib/complexes';
 import type { TowerStyle } from '../lib/towers';
 import type { WeatherState } from '../lib/weather';
 import { bloomComposer, readPalette, SEA_WAVE } from './common';
+import { addRig } from './rig';
 import { towerMeshes } from './towers';
 import { addWeather } from './weather';
 
@@ -49,18 +51,22 @@ interface Options {
   weather?: { state: WeatherState; week: string[] } | null;
   /** Seeds the weather's scatter. */
   seed?: string;
+  /** The big buildings, each standing in for a block of days, with the shade of the ramp it takes. */
+  complexes?: (Complex & { level: number })[];
 }
 
-const GAP = 0.82;
 const MAX_H = 7;
 const RISE_MS = 1600;
 const SWEEP_MS = 5200; // one scanner pass, including the rest before the next
+
+/** Empty days are sea, except today, which is a bare plot until something goes up on it. */
+const isSea = (cell: Cell) => cell[3] === 0 && cell[6] !== 'site';
 
 export function mountSkyline(
   host: HTMLElement,
   cells: Cell[],
   weeks: number,
-  { onHover, onReady, tag, signs = [], weather, seed = '' }: Options,
+  { onHover, onReady, tag, signs = [], weather, seed = '', complexes = [] }: Options,
 ): () => void {
   // No calendar, no city. Three.js also cannot build per-tile colors for an empty set.
   if (!cells.length) return () => {};
@@ -139,23 +145,25 @@ export function mountSkyline(
         totalEmissiveRadiance += uGlintColor * vGlint;`,
       );
   };
-  const towers = towerMeshes(
-    cells.map((c) => c[6]),
-    material,
-    {
-      floor: -0.5, // towers are placed by their centre, so they can grow from the ground up
-      // 1 for sea tiles (empty days), which the vertex shader moves as waves. Buildings stay put.
-      dress: (geometry, indices) =>
-        geometry.setAttribute(
-          'aSea',
-          new InstancedBufferAttribute(
-            Float32Array.from(indices, (i) => (cells[i][3] === 0 ? 1 : 0)),
-            1,
-          ),
+  // A day in a complex gets no building of its own, but keeps its plot, for hover and the overlays.
+  const complexOf = new Map(complexes.flatMap((complex) => complex.dates.map((date) => [date, complex])));
+  const solo = cells.filter((c) => !complexOf.has(c[5]));
+  const towers = towerMeshes([...solo.map((c) => c[6]), ...complexes], material, {
+    floor: -0.5, // towers are placed by their centre, so they can grow from the ground up
+    // 1 for sea tiles (empty days), which the vertex shader moves as waves. Buildings stay put.
+    dress: (geometry, indices) =>
+      geometry.setAttribute(
+        'aSea',
+        new InstancedBufferAttribute(
+          Float32Array.from(indices, (i) => (solo[i] && isSea(solo[i]) ? 1 : 0)),
+          1,
         ),
-    },
-  );
+      ),
+  });
   city.add(...towers.meshes);
+  // Today's plot, and the crane working on it.
+  const site = solo.findIndex((c) => c[6] === 'site');
+  const rig = site >= 0 ? addRig(city, GAP) : null;
   // Every day's whole plot, never drawn. Hover and the overlays go by these, since a spire is too thin to find with a
   // pointer, and they keep the day's full height whatever stands on it.
   const pickGeometry = new BoxGeometry(1, 1, 1);
@@ -194,8 +202,10 @@ export function mountSkyline(
   beam.visible = false;
   city.add(beam);
 
+  /** How tall a day's building stands: its own height, or the roof it shares. */
+  const fullHeight = (cell: Cell) => (cell[2] > 0 ? 0.15 + (complexOf.get(cell[5])?.height ?? cell[4]) * MAX_H : 0.04);
   // A tower's full roof, in city coordinates: where it stands once it has risen.
-  const roof = (cell: Cell) => new Vector3(cell[0] - weeks / 2, cell[2] > 0 ? 0.15 + cell[4] * MAX_H : 0.04, cell[1] - 3);
+  const roof = (cell: Cell) => new Vector3(cell[0] - weeks / 2, fullHeight(cell), cell[1] - 3);
   const week = new Set(weather?.week);
   const strike = cells.filter((c) => week.has(c[5]) && c[2] > 0).sort((a, b) => b[4] - a[4])[0];
   const peakCell = cells.find((c) => c[3] === 5);
@@ -219,8 +229,10 @@ export function mountSkyline(
     // The peak day burns brighter than everything else so bloom catches it.
     const peak = palette.peak.clone().multiplyScalar(night ? 1.4 : 1); // brighter than the rest so bloom catches it, without a big halo
     // Empty days are sea, the peak day is a bright neon green tower, the rest use the cyan ramp.
-    cells.forEach((cell, i) => towers.setColorAt(i, cell[3] === 5 ? peak : cell[3] === 0 ? palette.sea : palette.levels[cell[3]]));
+    solo.forEach((cell, i) => towers.setColorAt(i, cell[3] === 5 ? peak : isSea(cell) ? palette.sea : palette.levels[cell[3]]));
+    complexes.forEach(({ level }, i) => towers.setColorAt(solo.length + i, palette.levels[level]));
     towers.painted();
+    rig?.paint(palette);
     scene.background = palette.surface;
     fog.color.copy(palette.surface);
     uniforms.uGlintColor.value.copy(palette.rain).multiplyScalar(night ? 1.2 : 0.6);
@@ -235,16 +247,28 @@ export function mountSkyline(
   };
 
   const dummy = new Object3D();
-  const place = (progress: (cell: Cell) => number) => {
+  const place = (progress: (week: number) => number) => {
+    let tower = 0;
     cells.forEach((cell, i) => {
-      const [w, d, count, , height] = cell;
-      const full = count > 0 ? 0.15 + height * MAX_H : 0.04;
-      const h = Math.max(0.04, full * progress(cell));
+      const [w, d] = cell;
+      const h = Math.max(0.04, fullHeight(cell) * progress(w));
+      const shared = complexOf.has(cell[5]);
       dummy.position.set(w - weeks / 2, h / 2, d - 3);
-      dummy.scale.set(GAP, h, GAP);
+      // Plots under a complex touch, so the pointer never finds a street across its roof.
+      dummy.scale.set(shared ? 1 : GAP, h, shared ? 1 : GAP);
       dummy.updateMatrix();
-      towers.setMatrixAt(i, dummy.matrix);
       plots.setMatrixAt(i, dummy.matrix);
+      if (shared) return;
+      towers.setMatrixAt(tower, dummy.matrix);
+      if (tower === site) rig?.place(dummy.position.x, h, dummy.position.z); // it rides up on the tower
+      tower++;
+    });
+    complexes.forEach((complex, i) => {
+      const h = Math.max(0.04, (0.15 + complex.height * MAX_H) * progress(complex.week));
+      dummy.position.set(complex.week + (complex.weeks - 1) / 2 - weeks / 2, h / 2, complex.weekday + (complex.days - 1) / 2 - 3);
+      dummy.scale.set(complex.weeks - 1 + GAP, h, complex.days - 1 + GAP);
+      dummy.updateMatrix();
+      towers.setMatrixAt(solo.length + i, dummy.matrix);
     });
     towers.placed();
     plots.instanceMatrix.needsUpdate = true;
@@ -265,7 +289,7 @@ export function mountSkyline(
   controls.update();
 
   const signEls = signs.flatMap(({ date, text }, i) => {
-    const index = cells.findIndex((c) => c[5] === date && c[2] > 0);
+    const index = cells.findIndex((c) => c[5] === date && c[2] > 0 && c[6] !== 'site'); // a sign goes up once the building is finished
     if (index < 0) return [];
     const el = Object.assign(document.createElement('div'), { className: 'sky3d-sign', textContent: text });
     el.setAttribute('aria-hidden', 'true');
@@ -359,8 +383,8 @@ export function mountSkyline(
     const t = (now - start) / RISE_MS;
     if (!risen) {
       // Weeks rise left to right, each easing out.
-      place((cell) => {
-        const local = Math.min(1, Math.max(0, t * 1.6 - (cell[0] / weeks) * 0.6));
+      place((week) => {
+        const local = Math.min(1, Math.max(0, t * 1.6 - (week / weeks) * 0.6));
         return 1 - Math.pow(1 - local, 3);
       });
       if (t >= 1) risen = true;
@@ -377,6 +401,7 @@ export function mountSkyline(
       // small step toward white reads as a gray wash.
       const flash = sky?.update(now / 1000) ?? 0;
       ambient.intensity = 1.1 + flash * 0.6;
+      rig?.update(now / 1000);
     }
     render();
     if (!reduced || !risen) frame = requestAnimationFrame(tick);
@@ -426,6 +451,7 @@ export function mountSkyline(
     beam.geometry.dispose();
     beamMaterial.dispose();
     for (const { el } of signEls) el.remove();
+    rig?.dispose();
     sky?.dispose();
     renderer.dispose();
     renderer.domElement.remove();

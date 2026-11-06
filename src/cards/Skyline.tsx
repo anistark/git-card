@@ -1,18 +1,22 @@
+import { Fragment } from 'react';
+import { COMPLEX_NAMES, complexFaces, FILL, paintOrder, type ComplexStyle } from '../lib/complexes';
 import { findEggs, MAX_SIGNS, signEggs, type Egg } from '../lib/eggs';
 import { hasCalendar, type Profile } from '../lib/profile';
-import { TOWER_NAMES, towerOutline, type Face } from '../lib/towers';
+import { RIG, TOWER_NAMES, towerOutline, type Beam, type Face, type V } from '../lib/towers';
 import { weatherFor, type Weather } from '../lib/weather';
-import { heightOf, leveller, profileTowers, skylineFill } from './levels';
+import { heightOf, leveller, profileComplexes, profileTowers, skylineFill } from './levels';
 import { CalendarOffline, PAD, SIZES, Shell, shortDate, type CardProps } from './shell';
 import { WeatherBack, WeatherClip, WeatherFront, WeatherGround, type Box, type CityView } from './Weather';
 
 // Oblique projection: weeks run right and slightly down, weekdays run left and down, height is up.
 const W = { x: 10, y: 2.4 };
 const D = { x: -6.5, y: 5.2 };
-const FILL = 0.82;
 const MAX_H = 95;
 // Rooftop neon sign for an easter egg, in city units.
 const SIGN = { h: 11, rise: 12, char: 4.6, pad: 7, gap: 3 };
+// The rig on today's roof: a plot's width and depth, the same up, and how far past rest gc-slew stretches the jib.
+const PLOT = { w: [FILL * W.x, FILL * W.y], d: [FILL * D.x, FILL * D.y], z: FILL * W.x };
+const SWING = 1.2;
 
 type Pt = [number, number];
 const centerOf = (quad: Pt[]): Pt => [quad.reduce((n, p) => n + p[0], 0) / 4, quad.reduce((n, p) => n + p[1], 0) / 4];
@@ -20,6 +24,15 @@ const r = (n: number) => Math.round(n * 10) / 10;
 const pts = (list: Pt[]) => list.map(([x, y]) => `${r(x)},${r(y)}`).join(' ');
 /** The shade class for each way a building's face can look. */
 const SHADE: Record<Face['kind'], string> = { cap: '', right: 'r ', front: 'f ' };
+/** A point of the rig, from the middle of the roof. */
+const onRoof = ([x, y, z]: V): Pt => [x * PLOT.w[0] + y * PLOT.d[0], x * PLOT.w[1] + y * PLOT.d[1] - z * PLOT.z];
+const beams = (list: Beam[]) =>
+  list
+    .map((beam) => {
+      const [[x1, y1], [x2, y2]] = beam.map(onRoof);
+      return `M${r(x1)} ${r(y1)}L${r(x2)} ${r(y2)}`;
+    })
+    .join('');
 
 interface CityProps {
   profile: Profile;
@@ -40,6 +53,26 @@ export function SkylineCity({ profile, box, animate = true, weather, sky = box, 
   const max = profile.peakDay?.count ?? 0;
   const weeks = profile.weeks.length;
   const towers = profileTowers(profile);
+  const roofOf = (height: number) => 2 + height * MAX_H;
+
+  // A complex stands on many days, with one roof and one drawing for all of them.
+  const complexes = profileComplexes(profile).map((complex) => {
+    const a: Pt = [complex.week * W.x + complex.weekday * D.x, complex.week * W.y + complex.weekday * D.y];
+    const [wide, deep] = [complex.weeks - 1 + FILL, complex.days - 1 + FILL];
+    const across: Pt = [wide * W.x, wide * W.y];
+    const back: Pt = [deep * D.x, deep * D.y];
+    const [mx, my] = [a[0] + (across[0] + back[0]) / 2, a[1] + (across[1] + back[1]) / 2];
+    const h = roofOf(complex.height);
+    return {
+      ...complex,
+      h,
+      faces: towerOutline(complexFaces(complex), ([x, y, z]) => [
+        mx + x * across[0] + y * back[0],
+        my + x * across[1] + y * back[1] - z * h,
+      ]),
+    };
+  });
+  const complexOf = new Map(complexes.flatMap((complex) => complex.dates.map((date) => [date, complex])));
 
   const columns = profile.weeks.map((week, w) =>
     week.map((day) => {
@@ -49,22 +82,48 @@ export function SkylineCity({ profile, box, animate = true, weather, sky = box, 
       const b: Pt = [px + FILL * W.x, py + FILL * W.y];
       const c: Pt = [b[0] + FILL * D.x, b[1] + FILL * D.y];
       const e: Pt = [px + FILL * D.x, py + FILL * D.y];
-      const h = day.count > 0 ? 2 + heightOf(day.count, max) * MAX_H : 0;
+      const complex = complexOf.get(day.date);
+      const h = complex?.h ?? (day.count > 0 ? roofOf(heightOf(day.count, max)) : 0);
       const up = ([x, y]: Pt): Pt => [x, y - h];
       const style = towers.get(day.date) ?? 'block';
+      const site = style === 'site';
       // From the building's unit box onto this plot.
       const [mx, my] = centerOf([a, b, c, e]);
-      const faces = towerOutline(style, ([x, y, z]) => [
-        mx + x * (b[0] - a[0]) + y * (e[0] - a[0]),
-        my + x * (b[1] - a[1]) + y * (e[1] - a[1]) - z * h,
-      ]);
-      return { day, level: level(day), h, style, faces, top: [up(a), up(b), up(c), up(e)] };
+      const faces = complex
+        ? []
+        : towerOutline(style, ([x, y, z]) => [
+            mx + x * (b[0] - a[0]) + y * (e[0] - a[0]),
+            my + x * (b[1] - a[1]) + y * (e[1] - a[1]) - z * h,
+          ]);
+      const l = level(day);
+      return {
+        day,
+        week: w,
+        weekday: day.weekday,
+        complex,
+        level: l,
+        sea: l === 0 && !site,
+        h,
+        style,
+        faces,
+        rig: site ? ([mx, my - h] as Pt) : null,
+        top: [up(a), up(b), up(c), up(e)],
+      };
     }),
   );
 
   const signs = showSigns ? placeSigns(findEggs(profile), columns.flat()) : [];
+  // Everything standing, back to front, in runs of one week so each run can rise together.
+  const standing = paintOrder([...columns.flat().filter((c) => !c.sea && !c.complex), ...complexes]);
+  const runs = standing.reduce<(typeof standing)[]>((list, lot) => {
+    const run = list.at(-1);
+    if (run?.[0].week === lot.week) run.push(lot);
+    else list.push([lot]);
+    return list;
+  }, []);
   const all = [
-    ...columns.flat().flatMap((col) => col.faces.flatMap((face) => face.points)),
+    ...standing.flatMap((lot) => lot.faces.flatMap((face) => face.points)),
+    ...columns.flat().flatMap(({ rig }) => (rig ? rigReach(rig) : [])),
     ...signs.flatMap((s): Pt[] => [
       [s.x, s.y],
       [s.x + s.w, s.y],
@@ -102,6 +161,7 @@ export function SkylineCity({ profile, box, animate = true, weather, sky = box, 
       }
     : null;
   const fade = animate ? 'gc-a-fade' : undefined;
+  const counts = new Map(profile.weeks.flat().map((day) => [day.date, day.count]));
 
   return (
     <g>
@@ -128,7 +188,7 @@ export function SkylineCity({ profile, box, animate = true, weather, sky = box, 
           {columns.map((col, w) => (
             <g key={w} className={animate ? 'gc-wave' : undefined} style={animate ? { animationDelay: `${w * 60}ms` } : undefined}>
               {col
-                .filter((c) => c.level === 0)
+                .filter((c) => c.sea)
                 .map(({ day, top }) => (
                   <polygon key={day.date} className="gc-sea" points={pts(top)}>
                     <title>{`0 on ${shortDate(day.date)}`}</title>
@@ -140,22 +200,33 @@ export function SkylineCity({ profile, box, animate = true, weather, sky = box, 
         {weather && (
           <WeatherGround
             weather={weather}
-            tiles={columns.flat().flatMap((c) => (c.level === 0 ? [c.top] : []))}
+            tiles={columns.flat().flatMap((c) => (c.sea ? [c.top] : []))}
             seed={profile.login.toLowerCase()}
           />
         )}
-        {columns.map((col, w) => (
-          <g key={w} className={animate ? 'gc-a-rise' : undefined} style={animate ? { animationDelay: `${w * 12}ms` } : undefined}>
-            {col
-              .filter((c) => c.level > 0)
-              .map(({ day, level: l, style, faces }) => (
-                <g key={day.date} className={l === 5 ? 'gc-glow' : undefined}>
-                  <title>{`${TOWER_NAMES[style] ? `${TOWER_NAMES[style]}: ` : ''}${day.count} on ${shortDate(day.date)}`}</title>
-                  {faces.map(({ kind, points }, i) => (
-                    <polygon key={i} className={`${SHADE[kind]}${skylineFill(l)}`} points={pts(points)} />
-                  ))}
-                </g>
-              ))}
+        {runs.map((run, i) => (
+          <g
+            key={i}
+            className={animate ? 'gc-a-rise' : undefined}
+            style={animate ? { animationDelay: `${run[0].week * 12}ms` } : undefined}
+          >
+            {run.map((lot) => {
+              if ('dates' in lot) return <ComplexBuilding key={lot.dates[0]} complex={lot} counts={counts} />;
+              const { day, level: l, style, faces, rig } = lot;
+              const title = `${TOWER_NAMES[style] ? `${TOWER_NAMES[style]}: ` : ''}${day.count} on ${shortDate(day.date)}`;
+              return (
+                <Fragment key={day.date}>
+                  <g className={l === 5 ? 'gc-glow' : undefined}>
+                    <title>{title}</title>
+                    {faces.map(({ kind, points }, i) => (
+                      <polygon key={i} className={`${SHADE[kind]}${l > 0 ? skylineFill(l) : 'gc-l0'}`} points={pts(points)} />
+                    ))}
+                  </g>
+                  {/* Beside the tower, not in it: a moving part inside a glow would redo the filter every frame. */}
+                  {rig && <Rig at={rig} title={title} />}
+                </Fragment>
+              );
+            })}
           </g>
         ))}
       </g>
@@ -194,6 +265,44 @@ export function SkylineCity({ profile, box, animate = true, weather, sky = box, 
   );
 }
 
+interface BuildingProps {
+  complex: { style: ComplexStyle; dates: string[]; level: number; faces: { kind: Face['kind']; points: Pt[] }[] };
+  counts: Map<string, number>;
+}
+
+/** One building across a block of days. Its name and total stand in for the days it replaced. */
+function ComplexBuilding({ complex: { style, dates, level, faces }, counts }: BuildingProps) {
+  const total = dates.reduce((sum, date) => sum + (counts.get(date) ?? 0), 0);
+  return (
+    <g>
+      <title>{`${COMPLEX_NAMES[style]}: ${total} over ${dates.length} days, ${shortDate(dates[0])} to ${shortDate(dates.at(-1)!)}`}</title>
+      {faces.map(({ kind, points }, i) => (
+        <polygon key={i} className={`${SHADE[kind]}${skylineFill(level)}`} points={pts(points)} />
+      ))}
+    </g>
+  );
+}
+
+/** Everywhere the rig reaches from a roof, with the jib at the far end of its swing. */
+const rigReach = ([x, y]: Pt): Pt[] => [RIG.mast, ...RIG.jib].flat().map((p) => [x + onRoof(p)[0] * SWING, y + onRoof(p)[1]]);
+
+/** Open steel and a crane on today's roof. At rest for a still frame, and the jib swings slowly when it can move. */
+function Rig({ at: [x, y], title }: { at: Pt; title: string }) {
+  const [bx, by] = onRoof(RIG.beacon);
+  return (
+    <g className="gc-accent-s" fill="none" transform={`translate(${r(x)} ${r(y)})`}>
+      <title>{title}</title>
+      <path d={beams(RIG.steel)} strokeWidth={0.5} opacity={0.75} />
+      <path d={beams([RIG.mast])} strokeWidth={0.8} />
+      <g className="gc-slew">
+        <path d={beams(RIG.jib)} strokeWidth={0.55} />
+        <path d={beams(RIG.weights)} strokeWidth={1.8} />
+      </g>
+      <circle className="gc-accent gc-beacon" cx={r(bx)} cy={r(by)} r={0.9} stroke="none" />
+    </g>
+  );
+}
+
 interface Sign {
   egg: Egg & { sign: string; date: string };
   /** Top-left of the sign, and the roof it stands on, in city units. */
@@ -204,12 +313,12 @@ interface Sign {
 }
 
 /** Signs for the rarest eggs, each on its day's roof, skipping any that would overlap one already placed. */
-function placeSigns(eggs: Egg[], cells: { day: { date: string }; h: number; top: Pt[] }[]): Sign[] {
+function placeSigns(eggs: Egg[], cells: { day: { date: string }; h: number; rig: Pt | null; top: Pt[] }[]): Sign[] {
   const byDate = new Map(cells.map((c) => [c.day.date, c]));
   const placed: Sign[] = [];
   for (const egg of signEggs(eggs)) {
     const cell = byDate.get(egg.date);
-    if (!cell || cell.h === 0) continue;
+    if (!cell || cell.h === 0 || cell.rig) continue; // a sign goes up once the building is finished
     const cx = cell.top.reduce((n, p) => n + p[0], 0) / 4;
     const roof = cell.top.reduce((n, p) => n + p[1], 0) / 4;
     const w = egg.sign.length * SIGN.char + SIGN.pad;

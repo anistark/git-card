@@ -18,7 +18,8 @@ export type TowerStyle =
   | 'empire'
   | 'petronas'
   | 'taipei'
-  | 'burj';
+  | 'burj'
+  | 'site';
 
 /** What a viewer calls each landmark. Plain buildings have no name. */
 export const TOWER_NAMES: Partial<Record<TowerStyle, string>> = {
@@ -32,6 +33,7 @@ export const TOWER_NAMES: Partial<Record<TowerStyle, string>> = {
   petronas: 'Petronas Towers',
   taipei: 'Taipei 101',
   burj: 'Burj Khalifa',
+  site: 'Under construction',
 };
 
 /**
@@ -75,7 +77,7 @@ export function towerStyles(days: { id: string; height: number }[], peak?: strin
   );
 }
 
-type Pt = [number, number];
+export type Pt = [number, number];
 export type V = [number, number, number];
 
 /** One solid in a building: a tapered prism in a unit box, with the plot running -0.5 to 0.5 and height 0 to 1. */
@@ -84,10 +86,14 @@ export interface Part {
   z: Pt;
   /** Half width at the bottom and the top, as shares of the plot. 0.5 fills it, 0 at the top makes a point. */
   r: Pt;
+  /** Half depth, for a part that is not as deep as it is wide. Defaults to the width. */
+  ry?: Pt;
   /** Centre at the bottom and the top. Legs lean in with this. Defaults to the middle of the plot. */
   at?: [Pt, Pt];
   /** 8 for round things. */
   sides?: 4 | 8;
+  /** One shade for every face, whichever way it looks: a pitched roof over dark walls, or paint on a flat floor. */
+  shade?: Face['kind'];
 }
 
 const tier = (z0: number, z1: number, r0: number, r1 = r0, sides: 4 | 8 = 4): Part => ({ z: [z0, z1], r: [r0, r1], sides });
@@ -202,6 +208,57 @@ const BUILDINGS: Record<TowerStyle, Part[]> = {
     tier(0.73, 0.81, 0.1, 0.07),
     spire(0.81, 0.06),
   ],
+  // Today's plot. Flat, so the rig has a roof to stand on, whatever the day turns into once it is over.
+  site: [tier(0, 1, 0.5)],
+};
+
+/** A straight run of steel between two points. */
+export type Beam = [V, V];
+
+const beam = (a: V, b: V): Beam => [a, b];
+const post = ([x, y]: Pt, z: number): Beam => [
+  [x, y, 0],
+  [x, y, z],
+];
+/** Beams around a floor at height z, corner to corner. */
+const floor = (z: number, ...corners: Pt[]): Beam[] => corners.slice(1).map((corner, i) => beam([...corners[i], z], [...corner, z]));
+
+const [BACK, RIGHT, FRONT, LEFT]: Pt[] = [
+  [-0.5, -0.5],
+  [0.5, -0.5],
+  [0.5, 0.5],
+  [-0.5, 0.5],
+];
+const JIB = 3;
+const APEX = 3.7;
+const HOOK = { x: 1.75, z: 1.75 };
+
+/**
+ * What stands on a site's roof while the day is still going: two open floors and a tower crane. In plot widths from
+ * the middle of the roof, x along the weeks and z up. It stands above the day's real height and keeps its size on any
+ * tower, so the count stays honest and a short day still gets a crane that reads.
+ */
+export const RIG = {
+  /** The open floors, with the front corner one floor behind the rest. */
+  steel: [
+    post(BACK, 1.2),
+    post(RIGHT, 1.2),
+    post(LEFT, 1.2),
+    post(FRONT, 0.6),
+    ...floor(0.6, BACK, RIGHT, FRONT, LEFT, BACK),
+    ...floor(1.2, RIGHT, BACK, LEFT),
+  ],
+  mast: post([0, 0], APEX),
+  /** Everything that turns with the jib, around the mast: the jib itself, its ties and the hook line. */
+  jib: [
+    beam([-0.95, 0, JIB], [2.9, 0, JIB]),
+    beam([0, 0, APEX], [2.1, 0, JIB]),
+    beam([0, 0, APEX], [-0.85, 0, JIB]),
+    beam([HOOK.x, 0, JIB], [HOOK.x, 0, HOOK.z]),
+  ],
+  /** The heavy bits, which turn with the jib and draw thicker: the counterweight and the load on the hook. */
+  weights: [beam([-0.95, 0, JIB - 0.12], [-0.55, 0, JIB - 0.12]), beam([HOOK.x - 0.16, 0, HOOK.z], [HOOK.x + 0.16, 0, HOOK.z])],
+  beacon: [0, 0, APEX + 0.08] as V,
 };
 
 export interface Face {
@@ -215,32 +272,37 @@ export interface Face {
 const sub = (a: V, b: V): V => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const cross = (a: V, b: V): V => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 
-function face(points: V[], cap: boolean): Face {
+function face(points: V[], shade?: Face['kind']): Face {
   // Across the diagonals. A side that closes to a point has three corners, and the same sum works with c as d.
   const [a, b, c, d = c] = points;
   const n = cross(sub(c, a), sub(d, b));
   const length = Math.hypot(...n) || 1;
   const normal: V = [n[0] / length, n[1] / length, n[2] / length];
-  return { points, normal, kind: cap ? 'cap' : normal[0] >= normal[1] ? 'right' : 'front' };
+  return { points, normal, kind: shade ?? (normal[0] >= normal[1] ? 'right' : 'front') };
 }
 
 /** A ring of corners counter-clockwise from above, flat sides square to the plot. */
-function ring(r: number, [cx, cy]: Pt, z: number, sides: number): V[] {
-  const radius = r / Math.cos(Math.PI / sides);
+function ring(rx: number, ry: number, [cx, cy]: Pt, z: number, sides: number): V[] {
+  const out = 1 / Math.cos(Math.PI / sides);
   return Array.from({ length: sides }, (_, i) => {
     const angle = ((2 * i + 1) * Math.PI) / sides;
-    return [cx + radius * Math.cos(angle), cy + radius * Math.sin(angle), z];
+    return [cx + rx * out * Math.cos(angle), cy + ry * out * Math.sin(angle), z];
   });
 }
 
-function partFaces({ z, r, at = [[0, 0] as Pt, [0, 0] as Pt], sides = 4 }: Part): Face[] {
-  const bottom = ring(r[0], at[0], z[0], sides);
-  const top = ring(r[1], at[1], z[1], sides);
+/** Every face of one part, in paint order. */
+export function partFaces({ z, r, ry = r, at = [[0, 0] as Pt, [0, 0] as Pt], sides = 4, shade }: Part): Face[] {
+  const bottom = ring(r[0], ry[0], at[0], z[0], sides);
+  const top = ring(r[1], ry[1], at[1], z[1], sides);
   const walls = bottom.map((b, i) => {
     const next = (i + 1) % sides;
-    return face(r[1] > 0 ? [b, bottom[next], top[next], top[i]] : [b, bottom[next], top[i]], false);
+    return face(r[1] > 0 ? [b, bottom[next], top[next], top[i]] : [b, bottom[next], top[i]], shade);
   });
-  return [...(z[0] > 0 ? [face([...bottom].reverse(), true)] : []), ...walls, ...(r[1] > 0 ? [face(top, true)] : [])];
+  return [
+    ...(z[0] > 0 ? [face([...bottom].reverse(), 'cap')] : []),
+    ...walls,
+    ...(r[1] > 0 && ry[1] > 0 ? [face(top, shade ?? 'cap')] : []),
+  ];
 }
 
 const FACES = new Map<TowerStyle, Face[]>();
@@ -253,8 +315,8 @@ export function towerFaces(style: TowerStyle): Face[] {
 }
 
 /** The faces a flat drawing shows, through a projection that keeps the top of a block facing the viewer. */
-export function towerOutline(style: TowerStyle, project: (v: V) => Pt): { kind: Face['kind']; points: Pt[] }[] {
-  return towerFaces(style).flatMap(({ points, kind }) => {
+export function towerOutline(style: TowerStyle | Face[], project: (v: V) => Pt): { kind: Face['kind']; points: Pt[] }[] {
+  return (typeof style === 'string' ? towerFaces(style) : style).flatMap(({ points, kind }) => {
     const flat = points.map(project);
     // The shoelace sum: turned away from the viewer, a face winds the other way round.
     const area = flat.reduce((sum, [x, y], i) => {

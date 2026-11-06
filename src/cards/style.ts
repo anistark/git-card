@@ -58,6 +58,14 @@ const SKYLINE_CSS = (
   )
   .join('');
 
+// The crane on today's roof. Its jib turns 0.4 radians either side of the weeks axis, which in the card's oblique
+// projection is a skew and a squeeze around the mast. Verticals stay vertical, so the hook line keeps hanging straight.
+const RIG_CSS = `
+@keyframes gc-slew{0%,100%{transform:skewY(-10.7deg) scaleX(1.17)}50%{transform:skewY(15.3deg) scaleX(.67)}}
+.gc-slew{animation:gc-slew 26s ease-in-out infinite;}
+.gc-beacon{animation:gc-blink 2.6s ease-in-out infinite;}
+`;
+
 // Weather over the skyline. The plain rules are the still frame that OG images and reduced motion show.
 const WEATHER_CSS = `
 .gc-wx-star{fill:var(--text);opacity:.6;}
@@ -122,6 +130,7 @@ export const CARD_CSS = `
 .gc-duo{flood-color:var(--signal);}
 ${LEVEL_CSS}
 ${SKYLINE_CSS}
+${RIG_CSS}
 ${WEATHER_CSS}
 @keyframes gc-fade{from{opacity:0}}
 @keyframes gc-rise{from{opacity:0;transform:translateY(10px)}}

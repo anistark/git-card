@@ -37,7 +37,9 @@ Cards: `skyline`, `rank`, `citizen`, `overview`, `heatmap`, `streak`, `languages
 
 The `projects` card lists every public repository you worked in over the last 12 months, busiest first, with its description, languages and topics. It shows the top 10. Pick another number from the card on the site, or set `projects` in the Action, up to 50. The card grows taller to fit them.
 
-Your biggest days become landmarks. The skyline ranks your days and builds them in the order the real ones stand: Big Ben, the Eiffel Tower, Tokyo Tower, the KL Tower, the Empire State Building, the Petronas Towers and Taipei 101, with your peak day as the Burj Khalifa. Hover a tower to see which one it is.
+Your biggest days become landmarks. The skyline ranks your days and builds them in the order the real ones stand: Big Ben, the Eiffel Tower, Tokyo Tower, the KL Tower, the Empire State Building, the Petronas Towers and Taipei 101, with your peak day as the Burj Khalifa. Hover a tower to see which one it is. Today is still a construction site, with open steel and a crane on the roof, and it only turns into whatever it earned once the day is over.
+
+A run of similar days builds big. Where days stand shoulder to shoulder they merge into one building on one roof, the average of those days: an apartment block, a school, or your City Hall on the biggest block in town. If a run stands almost perfectly level you might find something rarer, a basketball court or even a football ground.
 
 Some days in the calendar hide easter eggs. Each one hangs a small neon sign on its tower in the skyline, and the profile page lists the ones found.
 

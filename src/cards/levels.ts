@@ -1,4 +1,5 @@
-import type { Day, Profile } from '../lib/profile';
+import { findComplexes, type Complex } from '../lib/complexes';
+import { currentDay, type Day, type Profile } from '../lib/profile';
 import { towerStyles, type TowerStyle } from '../lib/towers';
 import type { Cell } from '../scenes/skyline';
 
@@ -38,13 +39,40 @@ export function heightOf(count: number, max: number): number {
   return max > 0 ? Math.sqrt(count / max) : 0;
 }
 
-/** The building each day gets, by date. An empty day is not in it, since it is sea. */
+/**
+ * The building each day gets, by date. An empty day is not in it, since it is sea. Today is a construction site, even
+ * with nothing built yet, and whatever it ranks as only shows once the day is over.
+ */
 export function profileTowers(profile: Profile): Map<string, TowerStyle> {
   const max = profile.peakDay?.count ?? 0;
-  return towerStyles(
+  const towers = towerStyles(
     profile.weeks.flat().map((day) => ({ id: day.date, height: heightOf(day.count, max) })),
     profile.peakDay?.date,
   );
+  const today = currentDay(profile);
+  if (today) towers.set(today.date, 'site');
+  return towers;
+}
+
+/** The big buildings of a year, each with the shade its days average out to. */
+export function profileComplexes(profile: Profile): (Complex & { level: number })[] {
+  const max = profile.peakDay?.count ?? 0;
+  const towers = profileTowers(profile);
+  const level = leveller(profile);
+  const days = new Map(profile.weeks.flat().map((day) => [day.date, day]));
+  const lots = profile.weeks.flatMap((week, w) =>
+    week.map((day) => ({
+      id: day.date,
+      week: w,
+      weekday: day.weekday,
+      height: heightOf(day.count, max),
+      style: towers.get(day.date) ?? 'block',
+    })),
+  );
+  return findComplexes(lots).map((complex) => ({
+    ...complex,
+    level: Math.round(complex.dates.reduce((sum, date) => sum + level(days.get(date)!), 0) / complex.dates.length),
+  }));
 }
 
 /** Compact cells for the 3D view, shipped as JSON in the page. Shape: see Cell in scenes/skyline.ts. */

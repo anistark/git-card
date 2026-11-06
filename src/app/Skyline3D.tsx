@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { supportsWebGL } from './webgl';
-import { skylineCells } from '../cards/levels';
+import { profileComplexes, skylineCells } from '../cards/levels';
 import { track } from '../lib/analytics';
+import { COMPLEX_NAMES } from '../lib/complexes';
 import { findEggs, MAX_SIGNS, signEggs } from '../lib/eggs';
 import { shortDate } from '../lib/format';
 import { hasCalendar, type Profile } from '../lib/profile';
@@ -35,6 +36,8 @@ export function Skyline3D({ profile, weather: showWeather = true }: { profile: P
         const eggs = new Map<string, ReturnType<typeof signEggs>[number]>();
         for (const egg of signEggs(findEggs(profile))) if (!eggs.has(egg.date)) eggs.set(egg.date, egg);
         const seen = new Set<string>();
+        const complexes = profileComplexes(profile);
+        const complexOf = new Map(complexes.flatMap(({ dates, style }) => dates.map((date) => [date, COMPLEX_NAMES[style]])));
         dispose = mountSkyline(el, skylineCells(profile), profile.weeks.length, {
           onHover: (cell) => {
             const egg = cell && eggs.get(cell[5]);
@@ -42,7 +45,7 @@ export function Skyline3D({ profile, weather: showWeather = true }: { profile: P
               seen.add(egg.key);
               track('egg_hover', { egg: egg.key });
             }
-            const name = egg?.label ?? (cell && TOWER_NAMES[cell[6]]);
+            const name = egg?.label ?? (cell && (complexOf.get(cell[5]) ?? TOWER_NAMES[cell[6]]));
             if (readout.current)
               readout.current.textContent = cell
                 ? `${name ? `${name}: ` : ''}${cell[2]} on ${shortDate(cell[5])} ${cell[5].slice(0, 4)}`
@@ -53,6 +56,7 @@ export function Skyline3D({ profile, weather: showWeather = true }: { profile: P
           signs: [...eggs.values()].slice(0, MAX_SIGNS).map(({ date, sign }) => ({ date, text: sign })),
           weather: showWeather ? weatherFor(profile) : null,
           seed: profile.login.toLowerCase(),
+          complexes,
         });
       },
       { rootMargin: '200px' },

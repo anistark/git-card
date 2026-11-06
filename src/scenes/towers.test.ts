@@ -1,9 +1,11 @@
 import { Color, Matrix4, MeshBasicMaterial, Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
+import { COMPLEX_NAMES, type Complex, type ComplexStyle } from '../lib/complexes';
 import { TOWER_NAMES, type TowerStyle } from '../lib/towers';
 import { towerGeometry, towerMeshes } from './towers';
 
 const STYLES = ['block', 'setback', ...Object.keys(TOWER_NAMES)] as TowerStyle[];
+const complex = (style: ComplexStyle): Complex => ({ style, week: 0, weekday: 0, weeks: 5, days: 3, height: 0.4, dates: [] });
 
 describe('towerGeometry', () => {
   it.each(STYLES)('%s winds every triangle to face the way its normal does', (style) => {
@@ -18,6 +20,20 @@ describe('towerGeometry', () => {
       c.fromBufferAttribute(position, i + 2);
       n.fromBufferAttribute(normal, i);
       expect(b.clone().sub(a).cross(c.clone().sub(a)).dot(n)).toBeGreaterThan(0);
+    }
+  });
+
+  it.each(Object.keys(COMPLEX_NAMES) as ComplexStyle[])('%s winds every triangle that has any area to face out', (style) => {
+    const geometry = towerGeometry(complex(style));
+    const position = geometry.getAttribute('position');
+    const normal = geometry.getAttribute('normal');
+    const [a, b, c, n] = [new Vector3(), new Vector3(), new Vector3(), new Vector3()];
+    for (let i = 0; i < position.count; i += 3) {
+      a.fromBufferAttribute(position, i);
+      b.fromBufferAttribute(position, i + 1);
+      c.fromBufferAttribute(position, i + 2);
+      n.fromBufferAttribute(normal, i);
+      expect(b.clone().sub(a).cross(c.clone().sub(a)).dot(n)).toBeGreaterThanOrEqual(-1e-9);
     }
   });
 
@@ -49,6 +65,11 @@ describe('towerMeshes', () => {
   it('makes one mesh per shape, with room for its towers', () => {
     const { meshes } = towerMeshes(styles, new MeshBasicMaterial());
     expect(meshes.map((m) => m.count).sort()).toEqual([1, 2, 2]);
+  });
+
+  it('gives each complex a mesh of its own, since no two share a shape', () => {
+    const { meshes } = towerMeshes(['block', complex('apartments'), 'block', complex('apartments')], new MeshBasicMaterial());
+    expect(meshes.map((m) => m.count).sort()).toEqual([1, 1, 2]);
   });
 
   it('finds a tower by its index in the list', () => {

@@ -2,16 +2,20 @@
 // scene can treat a whole city as one list. Faces stay flat shaded, with a normal per face, and sides are darkened
 // like the SVG card's, or the bright neon washes the setbacks of a tower together. Materials need `vertexColors`.
 import { BufferAttribute, BufferGeometry, InstancedMesh, type Color, type Material, type Matrix4 } from 'three';
+import { complexFaces, type Complex } from '../lib/complexes';
 import { towerFaces, type Face, type TowerStyle } from '../lib/towers';
 
 const SHADE: Record<Face['kind'], number> = { cap: 1, right: 0.78, front: 0.58 };
 
+/** A building from the catalog, or a complex, which has a shape of its own. */
+export type Building = TowerStyle | Complex;
+
 /** A building in a 1 by 1 by 1 box, standing on y = `floor`. */
-export function towerGeometry(style: TowerStyle, floor = 0): BufferGeometry {
+export function towerGeometry(building: Building, floor = 0): BufferGeometry {
   const positions: number[] = [];
   const normals: number[] = [];
   const colors: number[] = [];
-  for (const { points, normal, kind } of towerFaces(style)) {
+  for (const { points, normal, kind } of typeof building === 'string' ? towerFaces(building) : complexFaces(building)) {
     // Scenes have y up. Swapping two axes mirrors the shape, so each fan runs the other way round to still face out.
     const [first, ...rest] = points;
     for (let i = rest.length - 1; i > 0; i--) {
@@ -47,18 +51,18 @@ interface MeshOptions {
 }
 
 /** Instanced meshes for a list of towers, one per shape in use. */
-export function towerMeshes(styles: TowerStyle[], material: Material, { floor = 0, dress }: MeshOptions = {}): TowerMeshes {
-  const shapes = new Map<TowerStyle, number[]>();
-  styles.forEach((style, i) => {
-    const towers = shapes.get(style);
+export function towerMeshes(buildings: Building[], material: Material, { floor = 0, dress }: MeshOptions = {}): TowerMeshes {
+  const shapes = new Map<Building, number[]>();
+  buildings.forEach((building, i) => {
+    const towers = shapes.get(building);
     if (towers) towers.push(i);
-    else shapes.set(style, [i]);
+    else shapes.set(building, [i]);
   });
 
   // Where each tower lives: its mesh, and its instance in that mesh.
   const slots: [InstancedMesh, number][] = [];
-  const meshes = [...shapes].map(([style, towers]) => {
-    const geometry = towerGeometry(style, floor);
+  const meshes = [...shapes].map(([building, towers]) => {
+    const geometry = towerGeometry(building, floor);
     dress?.(geometry, towers);
     const mesh = new InstancedMesh(geometry, material, towers.length);
     towers.forEach((tower, slot) => (slots[tower] = [mesh, slot]));

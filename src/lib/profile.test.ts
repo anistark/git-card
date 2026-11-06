@@ -6,6 +6,7 @@ import { projectChoice, projectChoices, projectsHeight, ProjectsCard, shownProje
 import { CARD_IDS, getCard } from '../cards/registry';
 import { truncate, wrap } from '../cards/shell';
 import {
+  currentDay,
   activeProjects,
   cleanDescription,
   computeStreaks,
@@ -148,6 +149,26 @@ describe('computeStreaks', () => {
 
   it('handles no activity', () => {
     expect(computeStreaks(days([0, 0, 0]), NOW)).toEqual({ current: 0, longest: 0, longestStart: null, longestEnd: null });
+  });
+});
+
+describe('currentDay', () => {
+  const week = ['2026-11-01', '2026-11-02', '2026-11-03'].map((date, weekday) => ({ date, count: 1, weekday }));
+
+  it('is the newest day on the calendar', () => {
+    expect(currentDay({ weeks: [week], fetchedAt: '2026-11-03T08:00:00.000Z' })?.date).toBe('2026-11-03');
+  });
+
+  it('skips days past the moment it was fetched', () => {
+    expect(currentDay({ weeks: [week], fetchedAt: '2026-11-02T23:59:00.000Z' })?.date).toBe('2026-11-02');
+  });
+
+  it('falls back on the last day known when the calendar stops short', () => {
+    expect(currentDay({ weeks: [week], fetchedAt: '2026-11-04T00:10:00.000Z' })?.date).toBe('2026-11-03');
+  });
+
+  it('is nothing without a calendar', () => {
+    expect(currentDay({ weeks: [], fetchedAt: '2026-11-04T00:10:00.000Z' })).toBeUndefined();
   });
 });
 
